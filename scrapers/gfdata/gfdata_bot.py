@@ -40,26 +40,56 @@ class GFDataBot:
         self.download_dir = DOWNLOAD_DIR
         self.download_dir.mkdir(parents=True, exist_ok=True)
         
-        # GF Data credentials from environment
-        self.gfdata_username = os.environ.get('GFDATA_USERNAME')
-        self.gfdata_password = os.environ.get('GFDATA_PASSWORD')
-        
         # Snowflake connection for data loading
         self.snowflake_conn = snowflake.connector.connect(
             user=os.environ.get('SNOWFLAKE_USER', 'JOHN_CLAUDE'),
             password=os.environ.get('SNOWFLAKE_PASSWORD'),
             account=os.environ.get('SNOWFLAKE_ACCOUNT'),
-            warehouse=os.environ.get('SNOWFLAKE_WAREHOUSE', 'COMPUTE_WH'),
+            warehouse=os.environ.get('SNOWFLAKE_WAREHOUSE', 'SOVEREIGN_MIND_WH'),
             database='HURRICANE',
             schema='MARKET_INTEL'
         )
         
         # Explicitly use warehouse
         cursor = self.snowflake_conn.cursor()
-        cursor.execute(f"USE WAREHOUSE {os.environ.get('SNOWFLAKE_WAREHOUSE', 'COMPUTE_WH')}")
+        cursor.execute(f"USE WAREHOUSE {os.environ.get('SNOWFLAKE_WAREHOUSE', 'SOVEREIGN_MIND_WH')}")
         cursor.close()
         
         print(f"[GFData Bot] Initialized - Snowflake connected")
+        
+        # GF Data credentials - check environment first, then Snowflake
+        self.gfdata_username = os.environ.get('GFDATA_USERNAME')
+        self.gfdata_password = os.environ.get('GFDATA_PASSWORD')
+        
+        if not self.gfdata_username or not self.gfdata_password:
+            print("[GFData Bot] Credentials not in environment, checking Snowflake...")
+            self._load_credentials_from_snowflake()
+    
+    def _load_credentials_from_snowflake(self):
+        """Load GF Data credentials from SOVEREIGN_MIND.CREDENTIALS.SERVICE_CREDENTIALS."""
+        cursor = self.snowflake_conn.cursor()
+        try:
+            # Query for GF_DATA credentials
+            cursor.execute("""
+                SELECT CREDENTIAL_KEY, CREDENTIAL_VALUE 
+                FROM SOVEREIGN_MIND.CREDENTIALS.SERVICE_CREDENTIALS 
+                WHERE SERVICE_NAME = 'GF_DATA' 
+                AND IS_ACTIVE = TRUE
+            """)
+            
+            for row in cursor.fetchall():
+                key, value = row
+                if key == 'login_email':
+                    self.gfdata_username = value
+                    print(f"[GFData Bot] Loaded username from Snowflake: {value}")
+                elif key == 'login_password':
+                    self.gfdata_password = value
+                    print("[GFData Bot] Loaded password from Snowflake")
+                    
+        except Exception as e:
+            print(f"[GFData Bot] Error loading credentials from Snowflake: {e}")
+        finally:
+            cursor.close()
     
     async def start_browser(self, headless: bool = True):
         """Initialize Playwright browser."""
@@ -82,7 +112,7 @@ class GFDataBot:
     async def login(self) -> bool:
         """Log into GF Data portal using environment credentials."""
         if not self.gfdata_username or not self.gfdata_password:
-            raise ValueError("GF Data credentials not found in environment (GFDATA_USERNAME, GFDATA_PASSWORD)")
+            raise ValueError("GF Data credentials not found in environment or Snowflake (GFDATA_USERNAME, GFDATA_PASSWORD)")
         
         print(f"[GFData Bot] Logging in as {self.gfdata_username}...")
         
