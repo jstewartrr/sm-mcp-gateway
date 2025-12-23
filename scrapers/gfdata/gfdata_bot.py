@@ -1,12 +1,12 @@
 """
-GF Data Automation Bot v3
-=========================
+GF Data Automation Bot v3.2
+===========================
 Automated extraction of PE transaction data from GF Data portal.
 Uses Playwright for browser automation and Snowflake for data storage.
 
 Author: Sovereign Mind Intelligence System
 Created: December 2024
-Updated: December 2024 - Calibrated selectors for actual GF Data UI
+Updated: December 2024 - Fixed javascript:void(0) export button handling
 """
 
 import asyncio
@@ -482,18 +482,20 @@ class GFDataBot:
         
         await self.page.screenshot(path=str(self.download_dir / "06_search_results.png"))
         
-        # Download to Excel - EXACT TEXT: "Export to Excel"
+        # Download to Excel - Handle javascript:void(0) button
         print("[GFData Bot] Downloading results...")
         
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"gfdata_export_{timestamp}.xlsx"
         filepath = self.download_dir / filename
         
-        # Priority order: exact match first, then fallbacks
+        # Selectors for Export to Excel button (javascript:void(0) triggered)
         download_selectors = [
-            # EXACT match for GF Data UI
-            'button:has-text("Export to Excel")',
+            # EXACT match for GF Data UI - the button uses javascript:void(0)
             'a:has-text("Export to Excel")',
+            'button:has-text("Export to Excel")',
+            'a[href="javascript:void(0);"]:has-text("Export")',
+            'a[href="javascript:void(0);"]:has-text("Excel")',
             ':text("Export to Excel")',
             # Fallbacks
             'button:has-text("Excel")',
@@ -505,32 +507,85 @@ class GFDataBot:
             '.export-btn',
             '.download-excel',
             'button[title*="Excel" i]',
-            'a[href*="export" i]',
-            'a[href*="download" i]',
             '#exportExcel',
             '#downloadBtn'
         ]
         
+        # Find and click the export button
+        export_button = None
+        for selector in download_selectors:
+            try:
+                locator = self.page.locator(selector)
+                if await locator.count() > 0:
+                    export_button = locator.first
+                    print(f"[GFData Bot] Found export button: {selector}")
+                    break
+            except Exception:
+                continue
+        
+        if not export_button:
+            await self.page.screenshot(path=str(self.download_dir / "no_export_button.png"))
+            raise Exception("Could not find Export to Excel button")
+        
+        # Set up download handler BEFORE clicking
+        # For javascript:void(0) buttons, the download is triggered by JS onclick
         try:
-            async with self.page.expect_download(timeout=60000) as download_info:
-                for selector in download_selectors:
-                    try:
-                        locator = self.page.locator(selector)
-                        if await locator.count() > 0:
-                            await locator.click(timeout=10000)
-                            print(f"[GFData Bot] Clicked download: {selector}")
-                            break
-                    except Exception:
-                        continue
+            # Method 1: Use expect_download with the click inside
+            async with self.page.expect_download(timeout=90000) as download_info:
+                await export_button.click(timeout=10000)
+                print("[GFData Bot] Clicked export button, waiting for download...")
             
             download = await download_info.value
             await download.save_as(str(filepath))
             print(f"[GFData Bot] Downloaded: {filepath}")
             
         except Exception as e:
-            print(f"[GFData Bot] Download error: {e}")
-            await self.page.screenshot(path=str(self.download_dir / "download_error.png"))
-            raise
+            print(f"[GFData Bot] Method 1 failed: {e}")
+            
+            # Method 2: Click first, then wait for download event
+            try:
+                print("[GFData Bot] Trying alternative download method...")
+                
+                # Set up a download listener
+                download_promise = asyncio.create_task(
+                    self.page.wait_for_event('download', timeout=90000)
+                )
+                
+                # Click the button
+                await export_button.click(timeout=10000)
+                print("[GFData Bot] Clicked export, waiting for download event...")
+                
+                # Wait for download
+                download = await download_promise
+                await download.save_as(str(filepath))
+                print(f"[GFData Bot] Downloaded via method 2: {filepath}")
+                
+            except Exception as e2:
+                print(f"[GFData Bot] Method 2 failed: {e2}")
+                
+                # Method 3: Check if file was downloaded to default location
+                try:
+                    print("[GFData Bot] Trying method 3: Check for recent downloads...")
+                    await asyncio.sleep(10)  # Wait for potential download
+                    
+                    # Look for recently created xlsx files
+                    import glob
+                    recent_files = glob.glob("/tmp/*.xlsx") + glob.glob("/tmp/gfdata_downloads/*.xlsx")
+                    if recent_files:
+                        most_recent = max(recent_files, key=os.path.getctime)
+                        if os.path.getctime(most_recent) > (datetime.now().timestamp() - 60):
+                            import shutil
+                            shutil.copy(most_recent, str(filepath))
+                            print(f"[GFData Bot] Found download at: {most_recent}")
+                        else:
+                            raise Exception("No recent download found")
+                    else:
+                        raise Exception("No xlsx files found")
+                        
+                except Exception as e3:
+                    print(f"[GFData Bot] Method 3 failed: {e3}")
+                    await self.page.screenshot(path=str(self.download_dir / "download_error.png"))
+                    raise Exception(f"All download methods failed. Last error: {e3}")
         
         return filepath
     
@@ -617,7 +672,7 @@ class GFDataBot:
                 (source_id, job_type, job_status, started_at, completed_at, 
                  reports_found, reports_new, scraper_version, execution_environment)
                 VALUES (%s, 'SCHEDULED', 'COMPLETED', CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(),
-                        %s, %s, '3.1.0', 'PLAYWRIGHT_BOT')
+                        %s, %s, '3.2.0', 'PLAYWRIGHT_BOT')
             """, (source_id, records_loaded, records_loaded))
             self.snowflake_conn.commit()
         except:
