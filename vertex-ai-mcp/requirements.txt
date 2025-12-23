@@ -1,0 +1,6 @@
+flask==3.0.0
+gunicorn==21.2.0
+google-cloud-aiplatform==1.76.0
+vertexai>=1.76.0
+google-cloud-vision==3.7.0
+google-auth==2.27.0
