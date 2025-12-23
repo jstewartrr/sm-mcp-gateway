@@ -24,58 +24,11 @@ GFDATA_DASHBOARD_URL = "https://gfdata.sigmify.com/dashboard"
 DOWNLOAD_DIR = Path("/tmp/gfdata_downloads")
 
 
-class SnowflakeCredentialStore:
-    """Retrieve credentials from Snowflake secure storage."""
-    
-    def __init__(self):
-        self.conn = snowflake.connector.connect(
-            user=os.environ.get('SNOWFLAKE_USER', 'JOHN_CLAUDE'),
-            password=os.environ.get('SNOWFLAKE_PASSWORD'),
-            account=os.environ.get('SNOWFLAKE_ACCOUNT'),
-            warehouse=os.environ.get('SNOWFLAKE_WAREHOUSE', 'COMPUTE_WH'),
-            database='SOVEREIGN_MIND',
-            schema='CREDENTIALS'
-        )
-    
-    def get_credential(self, service_name: str, credential_type: str) -> Optional[str]:
-        """Retrieve a credential value from secure storage."""
-        cursor = self.conn.cursor()
-        try:
-            cursor.execute("""
-                SELECT credential_value 
-                FROM SERVICE_CREDENTIALS 
-                WHERE service_name = %s 
-                AND credential_type = %s 
-                AND is_active = TRUE
-            """, (service_name, credential_type))
-            result = cursor.fetchone()
-            return result[0] if result else None
-        finally:
-            cursor.close()
-    
-    def update_last_used(self, service_name: str):
-        """Update the last_used_at timestamp for a service."""
-        cursor = self.conn.cursor()
-        try:
-            cursor.execute("""
-                UPDATE SERVICE_CREDENTIALS 
-                SET last_used_at = CURRENT_TIMESTAMP()
-                WHERE service_name = %s
-            """, (service_name,))
-            self.conn.commit()
-        finally:
-            cursor.close()
-    
-    def close(self):
-        self.conn.close()
-
-
 class GFDataBot:
     """
     Automated bot for extracting data from GF Data portal.
     
     Features:
-    - Secure credential retrieval from Snowflake
     - Browser automation via Playwright
     - Excel download and parsing
     - Direct load to Snowflake MARKET_INTEL schema
@@ -84,19 +37,29 @@ class GFDataBot:
     def __init__(self):
         self.browser: Optional[Browser] = None
         self.page: Optional[Page] = None
-        self.credential_store = SnowflakeCredentialStore()
         self.download_dir = DOWNLOAD_DIR
         self.download_dir.mkdir(parents=True, exist_ok=True)
         
+        # GF Data credentials from environment
+        self.gfdata_username = os.environ.get('GFDATA_USERNAME')
+        self.gfdata_password = os.environ.get('GFDATA_PASSWORD')
+        
         # Snowflake connection for data loading
         self.snowflake_conn = snowflake.connector.connect(
-            user=os.environ.get('SNOWFLAKE_USER', 'CLAUDE_FULL_ACCESS'),
+            user=os.environ.get('SNOWFLAKE_USER', 'JOHN_CLAUDE'),
             password=os.environ.get('SNOWFLAKE_PASSWORD'),
             account=os.environ.get('SNOWFLAKE_ACCOUNT'),
             warehouse=os.environ.get('SNOWFLAKE_WAREHOUSE', 'COMPUTE_WH'),
             database='HURRICANE',
             schema='MARKET_INTEL'
         )
+        
+        # Explicitly use warehouse
+        cursor = self.snowflake_conn.cursor()
+        cursor.execute(f"USE WAREHOUSE {os.environ.get('SNOWFLAKE_WAREHOUSE', 'COMPUTE_WH')}")
+        cursor.close()
+        
+        print(f"[GFData Bot] Initialized - Snowflake connected")
     
     async def start_browser(self, headless: bool = True):
         """Initialize Playwright browser."""
@@ -117,21 +80,18 @@ class GFDataBot:
         print("[GFData Bot] Browser initialized")
     
     async def login(self) -> bool:
-        """Log into GF Data portal using stored credentials."""
-        username = self.credential_store.get_credential('GF_DATA', 'USERNAME')
-        password = self.credential_store.get_credential('GF_DATA', 'PASSWORD')
+        """Log into GF Data portal using environment credentials."""
+        if not self.gfdata_username or not self.gfdata_password:
+            raise ValueError("GF Data credentials not found in environment (GFDATA_USERNAME, GFDATA_PASSWORD)")
         
-        if not username or not password:
-            raise ValueError("GF Data credentials not found in secure storage")
-        
-        print(f"[GFData Bot] Logging in as {username}...")
+        print(f"[GFData Bot] Logging in as {self.gfdata_username}...")
         
         await self.page.goto(GFDATA_LOGIN_URL)
         await self.page.wait_for_load_state('networkidle')
         
         # Fill login form - adjust selectors based on actual page structure
-        await self.page.fill('input[type="email"], input[name="email"], #email', username)
-        await self.page.fill('input[type="password"], input[name="password"], #password', password)
+        await self.page.fill('input[type="email"], input[name="email"], #email', self.gfdata_username)
+        await self.page.fill('input[type="password"], input[name="password"], #password', self.gfdata_password)
         
         # Click login button
         await self.page.click('button[type="submit"], input[type="submit"], .login-btn, #login-btn')
@@ -140,7 +100,6 @@ class GFDataBot:
         try:
             await self.page.wait_for_url('**/dashboard**', timeout=30000)
             print("[GFData Bot] Login successful")
-            self.credential_store.update_last_used('GF_DATA')
             return True
         except Exception as e:
             print(f"[GFData Bot] Login failed: {e}")
@@ -368,8 +327,6 @@ class GFDataBot:
             await self.browser.close()
         if self.snowflake_conn:
             self.snowflake_conn.close()
-        if self.credential_store:
-            self.credential_store.close()
         print("[GFData Bot] Shutdown complete")
 
 
