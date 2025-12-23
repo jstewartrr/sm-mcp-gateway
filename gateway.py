@@ -19,6 +19,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 
 import httpx
+import uvicorn
 from pydantic import BaseModel, Field, ConfigDict
 from mcp.server.fastmcp import FastMCP
 
@@ -41,8 +42,8 @@ class GatewayConfig:
     SNOWFLAKE_DATABASE = os.getenv("SNOWFLAKE_DATABASE", "SOVEREIGN_MIND")
     SNOWFLAKE_ROLE = os.getenv("SNOWFLAKE_ROLE", "ACCOUNTADMIN")
     
-    # Asana
-    ASANA_ACCESS_TOKEN = os.getenv("ASANA_ACCESS_TOKEN", "")
+    # Asana - check both ASANA_TOKEN and ASANA_ACCESS_TOKEN
+    ASANA_ACCESS_TOKEN = os.getenv("ASANA_TOKEN") or os.getenv("ASANA_ACCESS_TOKEN", "")
     ASANA_WORKSPACE_ID = os.getenv("ASANA_WORKSPACE_ID", "373563495855656")
     
     # Make.com
@@ -948,7 +949,7 @@ async def gateway_status(params: GatewayStatusInput) -> str:
     """
     status = {
         "gateway": "sovereign_mind_gateway",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "timestamp": datetime.utcnow().isoformat(),
         "services": {
             "snowflake": {
@@ -999,4 +1000,6 @@ if __name__ == "__main__":
     if transport == "stdio":
         mcp.run()
     else:
-        mcp.run(transport="streamable_http", port=port)
+        # For HTTP transport, use uvicorn directly with the ASGI app
+        app = mcp.get_app(transport="streamable-http")
+        uvicorn.run(app, host="0.0.0.0", port=port)
