@@ -111,8 +111,8 @@ class GFDataBot:
         )
         self.page = await context.new_page()
         
-        # Set download behavior
-        await self.page.context.set_default_timeout(60000)
+        # Set default timeout (not async)
+        self.page.set_default_timeout(60000)
         
         print("[GFData Bot] Browser initialized")
     
@@ -259,6 +259,8 @@ class GFDataBot:
             """)
             result = cursor.fetchone()
             return result[0] if result else None
+        except:
+            return None
         finally:
             cursor.close()
     
@@ -324,6 +326,8 @@ class GFDataBot:
                         %s, %s, '1.0.0', 'PLAYWRIGHT_BOT')
             """, (source_id, records_loaded, records_loaded))
             self.snowflake_conn.commit()
+        except:
+            pass  # Don't fail if logging fails
         finally:
             cursor.close()
     
