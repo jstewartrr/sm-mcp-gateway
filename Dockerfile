@@ -1,29 +1,16 @@
-# Sovereign Mind MCP Gateway
 FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system dependencies for Snowflake
-RUN apt-get update && apt-get install -y \
-    gcc \
-    g++ \
-    libffi-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy requirements first for better caching
+# Install dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
-COPY gateway.py .
-COPY gateway_sse.py .
+# Copy application
+COPY app.py .
 
 # Expose port
-EXPOSE 8000
+EXPOSE 8080
 
-# Environment defaults
-ENV MCP_TRANSPORT=streamable_http
-ENV PORT=8000
-
-# Run the gateway (default: HTTP transport)
-CMD ["python", "gateway.py"]
+# Run with gunicorn for production
+CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "2", "--threads", "4", "--timeout", "120", "app:app"]
