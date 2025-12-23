@@ -16,7 +16,7 @@ COPY gfdata_bot.py .
 ENV SNOWFLAKE_ACCOUNT=""
 ENV SNOWFLAKE_USER=""
 ENV SNOWFLAKE_PASSWORD=""
-ENV SNOWFLAKE_WAREHOUSE="COMPUTE_WH"
+ENV SNOWFLAKE_WAREHOUSE="SOVEREIGN_MIND_WH"
 
-# Run the bot
-CMD ["python", "gfdata_bot.py", "--profile", "full_lower_middle_market", "--days-back", "90"]
+# Run the bot with MGC core profile
+CMD ["python", "gfdata_bot.py", "--profile", "full_lower_middle_market"]
