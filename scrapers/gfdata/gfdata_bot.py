@@ -482,14 +482,20 @@ class GFDataBot:
         
         await self.page.screenshot(path=str(self.download_dir / "06_search_results.png"))
         
-        # Download to Excel
+        # Download to Excel - EXACT TEXT: "Export to Excel"
         print("[GFData Bot] Downloading results...")
         
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"gfdata_export_{timestamp}.xlsx"
         filepath = self.download_dir / filename
         
+        # Priority order: exact match first, then fallbacks
         download_selectors = [
+            # EXACT match for GF Data UI
+            'button:has-text("Export to Excel")',
+            'a:has-text("Export to Excel")',
+            ':text("Export to Excel")',
+            # Fallbacks
             'button:has-text("Excel")',
             'button:has-text("Download")',
             'button:has-text("Export")',
@@ -611,7 +617,7 @@ class GFDataBot:
                 (source_id, job_type, job_status, started_at, completed_at, 
                  reports_found, reports_new, scraper_version, execution_environment)
                 VALUES (%s, 'SCHEDULED', 'COMPLETED', CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(),
-                        %s, %s, '3.0.0', 'PLAYWRIGHT_BOT')
+                        %s, %s, '3.1.0', 'PLAYWRIGHT_BOT')
             """, (source_id, records_loaded, records_loaded))
             self.snowflake_conn.commit()
         except:
