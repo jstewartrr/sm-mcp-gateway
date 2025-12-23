@@ -1,11 +1,12 @@
 """
-GF Data Automation Bot
-======================
+GF Data Automation Bot v3
+=========================
 Automated extraction of PE transaction data from GF Data portal.
 Uses Playwright for browser automation and Snowflake for data storage.
 
 Author: Sovereign Mind Intelligence System
 Created: December 2024
+Updated: December 2024 - Calibrated selectors for actual GF Data UI
 """
 
 import asyncio
@@ -22,6 +23,26 @@ from playwright.async_api import async_playwright, Page, Browser
 GFDATA_LOGIN_URL = "https://gfdata.sigmify.com/signin.html"
 GFDATA_DASHBOARD_URL = "https://gfdata.sigmify.com/dashboard"
 DOWNLOAD_DIR = Path("/tmp/gfdata_downloads")
+
+# GF Data UI Configuration - Exact selector values
+BUSINESS_CATEGORIES = ['All', 'Distribution', 'Manufacturing']
+
+NAICS_CODES = {
+    'agriculture': 'Agriculture (100-115)',
+    'construction': 'Construction/Contractors (230-238)',
+    'manufacturing': 'Manufacturing (300-340)',
+    'repair_maintenance': 'Repair and Maintenance (810-811)',
+    'civic_government': 'Civic and Government (813-930)'
+}
+
+SORT_OPTIONS = [
+    'By TEV Range All Years',
+    'By EBITDA Range All Years',
+    'By TEV Range - Custom',
+    'By EBITDA Range - Custom',
+    'By Year All Years',
+    'By Quarter All Years'
+]
 
 
 class GFDataBot:
@@ -69,7 +90,6 @@ class GFDataBot:
         """Load GF Data credentials from SOVEREIGN_MIND.CREDENTIALS.SERVICE_CREDENTIALS."""
         cursor = self.snowflake_conn.cursor()
         try:
-            # Query for GF_DATA credentials
             cursor.execute("""
                 SELECT CREDENTIAL_KEY, CREDENTIAL_VALUE 
                 FROM SOVEREIGN_MIND.CREDENTIALS.SERVICE_CREDENTIALS 
@@ -103,37 +123,127 @@ class GFDataBot:
             viewport={'width': 1920, 'height': 1080}
         )
         self.page = await context.new_page()
-        
-        # Set default timeout (not async)
         self.page.set_default_timeout(60000)
         
         print("[GFData Bot] Browser initialized")
     
     async def login(self) -> bool:
-        """Log into GF Data portal using environment credentials."""
+        """Log into GF Data portal."""
         if not self.gfdata_username or not self.gfdata_password:
-            raise ValueError("GF Data credentials not found in environment or Snowflake (GFDATA_USERNAME, GFDATA_PASSWORD)")
+            raise ValueError("GF Data credentials not found")
         
         print(f"[GFData Bot] Logging in as {self.gfdata_username}...")
         
         await self.page.goto(GFDATA_LOGIN_URL)
         await self.page.wait_for_load_state('networkidle')
         
-        # Fill login form - adjust selectors based on actual page structure
-        await self.page.fill('input[type="email"], input[name="email"], #email', self.gfdata_username)
-        await self.page.fill('input[type="password"], input[name="password"], #password', self.gfdata_password)
+        # Take screenshot for debugging
+        await self.page.screenshot(path=str(self.download_dir / "01_login_page.png"))
         
-        # Click login button
-        await self.page.click('button[type="submit"], input[type="submit"], .login-btn, #login-btn')
+        # Try multiple selector strategies for email field
+        email_selectors = [
+            'input[type="email"]',
+            'input[name="email"]',
+            'input[placeholder*="email" i]',
+            'input[placeholder*="Email" i]',
+            '#email',
+            'input.email',
+            'input[id*="email" i]',
+            'input[name*="email" i]'
+        ]
         
-        # Wait for navigation to dashboard
+        email_filled = False
+        for selector in email_selectors:
+            try:
+                if await self.page.locator(selector).count() > 0:
+                    await self.page.fill(selector, self.gfdata_username, timeout=5000)
+                    email_filled = True
+                    print(f"[GFData Bot] Email filled using selector: {selector}")
+                    break
+            except Exception:
+                continue
+        
+        if not email_filled:
+            # Try finding any visible input field
+            inputs = await self.page.locator('input:visible').all()
+            print(f"[GFData Bot] Found {len(inputs)} visible input fields")
+            if len(inputs) >= 1:
+                await inputs[0].fill(self.gfdata_username)
+                email_filled = True
+                print("[GFData Bot] Email filled in first visible input")
+        
+        # Try multiple selector strategies for password field
+        password_selectors = [
+            'input[type="password"]',
+            'input[name="password"]',
+            '#password',
+            'input.password',
+            'input[id*="password" i]',
+            'input[name*="password" i]'
+        ]
+        
+        password_filled = False
+        for selector in password_selectors:
+            try:
+                if await self.page.locator(selector).count() > 0:
+                    await self.page.fill(selector, self.gfdata_password, timeout=5000)
+                    password_filled = True
+                    print(f"[GFData Bot] Password filled using selector: {selector}")
+                    break
+            except Exception:
+                continue
+        
+        if not password_filled:
+            inputs = await self.page.locator('input:visible').all()
+            if len(inputs) >= 2:
+                await inputs[1].fill(self.gfdata_password)
+                password_filled = True
+                print("[GFData Bot] Password filled in second visible input")
+        
+        await self.page.screenshot(path=str(self.download_dir / "02_credentials_entered.png"))
+        
+        # Click login/submit button
+        submit_selectors = [
+            'button[type="submit"]',
+            'input[type="submit"]',
+            'button:has-text("Sign In")',
+            'button:has-text("Login")',
+            'button:has-text("Log In")',
+            'button:has-text("Submit")',
+            '.login-btn',
+            '#login-btn',
+            'button.btn-primary',
+            'button:visible'
+        ]
+        
+        for selector in submit_selectors:
+            try:
+                if await self.page.locator(selector).count() > 0:
+                    await self.page.click(selector, timeout=5000)
+                    print(f"[GFData Bot] Clicked submit using selector: {selector}")
+                    break
+            except Exception:
+                continue
+        
+        # Wait for navigation
         try:
-            await self.page.wait_for_url('**/dashboard**', timeout=30000)
-            print("[GFData Bot] Login successful")
-            return True
+            await self.page.wait_for_load_state('networkidle', timeout=30000)
+            await asyncio.sleep(3)  # Extra wait for JS
+            
+            await self.page.screenshot(path=str(self.download_dir / "03_after_login.png"))
+            
+            current_url = self.page.url
+            print(f"[GFData Bot] Current URL after login: {current_url}")
+            
+            if 'signin' not in current_url.lower() and 'login' not in current_url.lower():
+                print("[GFData Bot] Login successful")
+                return True
+            else:
+                print("[GFData Bot] Still on login page - login may have failed")
+                return False
+                
         except Exception as e:
-            print(f"[GFData Bot] Login failed: {e}")
-            # Take screenshot for debugging
+            print(f"[GFData Bot] Login navigation error: {e}")
             await self.page.screenshot(path=str(self.download_dir / "login_error.png"))
             return False
     
@@ -141,84 +251,281 @@ class GFDataBot:
         """Navigate to the valuation database search interface."""
         print("[GFData Bot] Navigating to database...")
         
-        # Click on Database link - adjust selector based on actual UI
-        await self.page.click('a[href*="database"], .database-link, text="Database"')
-        await self.page.wait_for_load_state('networkidle')
+        # Try various navigation approaches
+        nav_selectors = [
+            'a:has-text("Database")',
+            'a[href*="database"]',
+            'text=Database',
+            '.nav >> text=Database',
+            'a:has-text("Search")',
+            'a:has-text("Valuation")'
+        ]
         
+        for selector in nav_selectors:
+            try:
+                if await self.page.locator(selector).count() > 0:
+                    await self.page.click(selector, timeout=10000)
+                    print(f"[GFData Bot] Navigated using: {selector}")
+                    break
+            except Exception:
+                continue
+        
+        await self.page.wait_for_load_state('networkidle')
+        await self.page.screenshot(path=str(self.download_dir / "04_database_page.png"))
         print("[GFData Bot] Database page loaded")
     
-    async def run_query(self, 
-                        naics_codes: Optional[List[str]] = None,
-                        deal_date_start: Optional[str] = None,
-                        deal_date_end: Optional[str] = None,
-                        tev_min: Optional[float] = None,
-                        tev_max: Optional[float] = None,
-                        ebitda_min: Optional[float] = None,
-                        ebitda_max: Optional[float] = None) -> Path:
+    async def configure_search(self, 
+                               business_category: str = 'All',
+                               naics_codes: List[str] = None,
+                               sort_by: str = 'By TEV Range - Custom',
+                               tev_min: float = None,
+                               tev_max: float = None):
         """
-        Execute a query on GF Data database and download results.
+        Configure search filters on GF Data.
         
         Args:
-            naics_codes: List of NAICS codes to filter (e.g., ['423', '332'])
-            deal_date_start: Start date for deals (YYYY-MM-DD)
-            deal_date_end: End date for deals (YYYY-MM-DD)
-            tev_min: Minimum total enterprise value ($M)
-            tev_max: Maximum total enterprise value ($M)
-            ebitda_min: Minimum EBITDA ($M)
-            ebitda_max: Maximum EBITDA ($M)
-        
-        Returns:
-            Path to downloaded Excel file
+            business_category: 'All', 'Distribution', or 'Manufacturing'
+            naics_codes: List of NAICS code keys from NAICS_CODES dict
+            sort_by: Sort option from SORT_OPTIONS
+            tev_min: Minimum TEV in $M (for custom range)
+            tev_max: Maximum TEV in $M (for custom range)
         """
-        print(f"[GFData Bot] Running query with filters:")
-        print(f"  NAICS: {naics_codes}")
-        print(f"  Date Range: {deal_date_start} to {deal_date_end}")
-        print(f"  TEV Range: ${tev_min}M - ${tev_max}M")
+        print(f"[GFData Bot] Configuring search...")
+        print(f"  Business Category: {business_category}")
+        print(f"  NAICS Codes: {naics_codes}")
+        print(f"  Sort By: {sort_by}")
+        if tev_min or tev_max:
+            print(f"  TEV Range: ${tev_min}M - ${tev_max}M")
         
-        # Apply filters - selectors will need adjustment based on actual UI
+        # 1. Select Business Category dropdown
+        # Look for select element with "Business Category" label nearby
+        try:
+            category_selectors = [
+                'select:near(:text("Business Category"))',
+                'select:near(:text("Select Business Category"))',
+                'select:first-of-type',
+                '#businessCategory',
+                'select[name*="business" i]',
+                'select[name*="category" i]',
+                '.business-category select'
+            ]
+            
+            for selector in category_selectors:
+                try:
+                    locator = self.page.locator(selector)
+                    if await locator.count() > 0:
+                        await locator.select_option(label=business_category, timeout=5000)
+                        print(f"[GFData Bot] Selected business category '{business_category}' via: {selector}")
+                        break
+                except Exception as e:
+                    continue
+            
+            # Fallback: click on dropdown and select option
+            if business_category != 'All':
+                try:
+                    await self.page.click(f'text="{business_category}"', timeout=3000)
+                    print(f"[GFData Bot] Clicked business category text: {business_category}")
+                except:
+                    pass
+                    
+        except Exception as e:
+            print(f"[GFData Bot] Could not set business category: {e}")
+        
+        await asyncio.sleep(0.5)
+        
+        # 2. Select NAICS codes
         if naics_codes:
-            for code in naics_codes:
-                # Multi-select NAICS codes
-                await self.page.click('.naics-filter, #naics-select')
-                await self.page.fill('.naics-search, input[placeholder*="NAICS"]', code)
-                await self.page.click(f'text="{code}"')
+            try:
+                naics_selectors = [
+                    'select:near(:text("NAICS"))',
+                    'select:near(:text("Select NAICS"))',
+                    'select:nth-of-type(2)',
+                    '#naicsCode',
+                    'select[name*="naics" i]',
+                    '.naics-select select'
+                ]
+                
+                for naics_key in naics_codes:
+                    # Get the full display value like "Manufacturing (300-340)"
+                    naics_value = NAICS_CODES.get(naics_key, naics_key)
+                    print(f"[GFData Bot] Selecting NAICS: {naics_value}")
+                    
+                    selected = False
+                    for selector in naics_selectors:
+                        try:
+                            locator = self.page.locator(selector)
+                            if await locator.count() > 0:
+                                await locator.select_option(label=naics_value, timeout=3000)
+                                print(f"[GFData Bot] Selected NAICS via: {selector}")
+                                selected = True
+                                break
+                        except:
+                            continue
+                    
+                    # Fallback: try clicking the text directly
+                    if not selected:
+                        try:
+                            await self.page.click(f'text="{naics_value}"', timeout=3000)
+                            print(f"[GFData Bot] Clicked NAICS text: {naics_value}")
+                        except:
+                            pass
+                            
+            except Exception as e:
+                print(f"[GFData Bot] Could not set NAICS codes: {e}")
         
-        if deal_date_start:
-            await self.page.fill('input[name="date_start"], #date-start', deal_date_start)
+        await asyncio.sleep(0.5)
         
-        if deal_date_end:
-            await self.page.fill('input[name="date_end"], #date-end', deal_date_end)
+        # 3. Select Sort By option
+        try:
+            sort_selectors = [
+                'select:near(:text("Sort By"))',
+                'select:near(:text("Sort"))',
+                'select:nth-of-type(3)',
+                '#sortBy',
+                'select[name*="sort" i]',
+                '.sort-select select'
+            ]
+            
+            for selector in sort_selectors:
+                try:
+                    locator = self.page.locator(selector)
+                    if await locator.count() > 0:
+                        await locator.select_option(label=sort_by, timeout=5000)
+                        print(f"[GFData Bot] Selected sort '{sort_by}' via: {selector}")
+                        break
+                except:
+                    continue
+                    
+        except Exception as e:
+            print(f"[GFData Bot] Could not set sort option: {e}")
         
-        if tev_min:
-            await self.page.fill('input[name="tev_min"], #tev-min', str(tev_min))
+        await asyncio.sleep(0.5)
         
-        if tev_max:
-            await self.page.fill('input[name="tev_max"], #tev-max', str(tev_max))
+        # 4. If custom TEV range, set min/max values
+        if 'Custom' in sort_by and (tev_min is not None or tev_max is not None):
+            await asyncio.sleep(1)  # Wait for custom fields to appear
+            
+            if tev_min is not None:
+                tev_min_selectors = [
+                    'input[name*="min" i]',
+                    'input[placeholder*="min" i]',
+                    'input:near(:text("Min"))',
+                    'input:near(:text("From"))',
+                    '#tevMin',
+                    '#minTev',
+                    'input.min-value',
+                    'input[type="number"]:first-of-type'
+                ]
+                for selector in tev_min_selectors:
+                    try:
+                        locator = self.page.locator(selector)
+                        if await locator.count() > 0:
+                            await locator.fill(str(int(tev_min)), timeout=3000)
+                            print(f"[GFData Bot] Set TEV min: ${tev_min}M via {selector}")
+                            break
+                    except:
+                        continue
+            
+            if tev_max is not None:
+                tev_max_selectors = [
+                    'input[name*="max" i]',
+                    'input[placeholder*="max" i]',
+                    'input:near(:text("Max"))',
+                    'input:near(:text("To"))',
+                    '#tevMax',
+                    '#maxTev',
+                    'input.max-value',
+                    'input[type="number"]:last-of-type'
+                ]
+                for selector in tev_max_selectors:
+                    try:
+                        locator = self.page.locator(selector)
+                        if await locator.count() > 0:
+                            await locator.fill(str(int(tev_max)), timeout=3000)
+                            print(f"[GFData Bot] Set TEV max: ${tev_max}M via {selector}")
+                            break
+                    except:
+                        continue
         
-        # Click search/apply button
-        await self.page.click('button:has-text("Search"), button:has-text("Apply"), .search-btn')
+        await self.page.screenshot(path=str(self.download_dir / "05_filters_configured.png"))
+        print("[GFData Bot] Search filters configured")
+    
+    async def execute_search_and_download(self) -> Path:
+        """Execute the search and download results to Excel."""
+        print("[GFData Bot] Executing search...")
+        
+        # Click search/apply/submit button
+        search_selectors = [
+            'button:has-text("Search")',
+            'button:has-text("Apply")',
+            'button:has-text("Submit")',
+            'button:has-text("Go")',
+            'button:has-text("Filter")',
+            'input[type="submit"]',
+            'button.search-btn',
+            'button.btn-primary',
+            '#searchBtn'
+        ]
+        
+        for selector in search_selectors:
+            try:
+                locator = self.page.locator(selector)
+                if await locator.count() > 0:
+                    await locator.click(timeout=10000)
+                    print(f"[GFData Bot] Clicked search: {selector}")
+                    break
+            except Exception:
+                continue
+        
         await self.page.wait_for_load_state('networkidle')
+        await asyncio.sleep(3)  # Wait for results to load
         
-        print("[GFData Bot] Query executed, downloading results...")
+        await self.page.screenshot(path=str(self.download_dir / "06_search_results.png"))
         
         # Download to Excel
-        download_path = await self._download_excel()
-        return download_path
-    
-    async def _download_excel(self) -> Path:
-        """Click download button and save Excel file."""
+        print("[GFData Bot] Downloading results...")
+        
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"gfdata_export_{timestamp}.xlsx"
         filepath = self.download_dir / filename
         
-        # Start download
-        async with self.page.expect_download() as download_info:
-            await self.page.click('button:has-text("Excel"), button:has-text("Download"), .export-btn, .download-excel')
+        download_selectors = [
+            'button:has-text("Excel")',
+            'button:has-text("Download")',
+            'button:has-text("Export")',
+            'a:has-text("Excel")',
+            'a:has-text("Download")',
+            'a:has-text("Export")',
+            '.export-btn',
+            '.download-excel',
+            'button[title*="Excel" i]',
+            'a[href*="export" i]',
+            'a[href*="download" i]',
+            '#exportExcel',
+            '#downloadBtn'
+        ]
         
-        download = await download_info.value
-        await download.save_as(str(filepath))
+        try:
+            async with self.page.expect_download(timeout=60000) as download_info:
+                for selector in download_selectors:
+                    try:
+                        locator = self.page.locator(selector)
+                        if await locator.count() > 0:
+                            await locator.click(timeout=10000)
+                            print(f"[GFData Bot] Clicked download: {selector}")
+                            break
+                    except Exception:
+                        continue
+            
+            download = await download_info.value
+            await download.save_as(str(filepath))
+            print(f"[GFData Bot] Downloaded: {filepath}")
+            
+        except Exception as e:
+            print(f"[GFData Bot] Download error: {e}")
+            await self.page.screenshot(path=str(self.download_dir / "download_error.png"))
+            raise
         
-        print(f"[GFData Bot] Downloaded: {filepath}")
         return filepath
     
     def parse_excel(self, filepath: Path) -> pd.DataFrame:
@@ -228,7 +535,7 @@ class GFDataBot:
         df = pd.read_excel(filepath)
         
         # Standardize column names
-        df.columns = [col.strip().upper().replace(' ', '_').replace('/', '_') for col in df.columns]
+        df.columns = [str(col).strip().upper().replace(' ', '_').replace('/', '_') for col in df.columns]
         
         # Add metadata
         df['SOURCE_FILE'] = filepath.name
@@ -254,17 +561,12 @@ class GFDataBot:
             cursor.close()
     
     def load_to_snowflake(self, df: pd.DataFrame, table_name: str = 'GFDATA_TRANSACTIONS'):
-        """
-        Load parsed data to Snowflake.
-        
-        Creates table if not exists, then appends data.
-        """
+        """Load parsed data to Snowflake."""
         print(f"[GFData Bot] Loading {len(df)} records to HURRICANE.MARKET_INTEL.{table_name}")
         
         cursor = self.snowflake_conn.cursor()
         
         try:
-            # Create table if not exists (dynamically based on DataFrame columns)
             columns_sql = ', '.join([
                 f'"{col}" VARCHAR' if df[col].dtype == 'object' 
                 else f'"{col}" FLOAT' if df[col].dtype in ['float64', 'float32']
@@ -281,7 +583,6 @@ class GFDataBot:
                 )
             """)
             
-            # Write DataFrame to Snowflake using write_pandas
             from snowflake.connector.pandas_tools import write_pandas
             
             success, nchunks, nrows, _ = write_pandas(
@@ -295,8 +596,6 @@ class GFDataBot:
             )
             
             print(f"[GFData Bot] Loaded {nrows} rows in {nchunks} chunks")
-            
-            # Log the scrape job
             self._log_scrape_job(len(df), table_name)
             
         finally:
@@ -312,26 +611,16 @@ class GFDataBot:
                 (source_id, job_type, job_status, started_at, completed_at, 
                  reports_found, reports_new, scraper_version, execution_environment)
                 VALUES (%s, 'SCHEDULED', 'COMPLETED', CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(),
-                        %s, %s, '1.0.0', 'PLAYWRIGHT_BOT')
+                        %s, %s, '3.0.0', 'PLAYWRIGHT_BOT')
             """, (source_id, records_loaded, records_loaded))
             self.snowflake_conn.commit()
         except:
-            pass  # Don't fail if logging fails
+            pass
         finally:
             cursor.close()
     
     async def run_full_extraction(self, query_params: Dict[str, Any]) -> int:
-        """
-        Run complete extraction workflow:
-        1. Login
-        2. Navigate to database
-        3. Run query
-        4. Download Excel
-        5. Parse and load to Snowflake
-        
-        Returns:
-            Number of records loaded
-        """
+        """Run complete extraction workflow."""
         try:
             await self.start_browser(headless=True)
             
@@ -340,7 +629,15 @@ class GFDataBot:
             
             await self.navigate_to_database()
             
-            excel_path = await self.run_query(**query_params)
+            await self.configure_search(
+                business_category=query_params.get('business_category', 'All'),
+                naics_codes=query_params.get('naics_codes'),
+                sort_by=query_params.get('sort_by', 'By TEV Range - Custom'),
+                tev_min=query_params.get('tev_min'),
+                tev_max=query_params.get('tev_max')
+            )
+            
+            excel_path = await self.execute_search_and_download()
             
             df = self.parse_excel(excel_path)
             
@@ -362,27 +659,31 @@ class GFDataBot:
 
 # Pre-configured query profiles for MGC focus areas
 QUERY_PROFILES = {
-    'industrial_distribution': {
-        'naics_codes': ['423', '424'],  # Wholesale Trade
+    'mgc_core': {
+        'business_category': 'All',
+        'naics_codes': ['construction', 'manufacturing', 'repair_maintenance'],
+        'sort_by': 'By TEV Range - Custom',
         'tev_min': 75,
         'tev_max': 400,
     },
-    'specialty_manufacturing': {
-        'naics_codes': ['332', '333', '334', '335', '336'],  # Manufacturing
+    'distribution_only': {
+        'business_category': 'Distribution',
+        'naics_codes': None,
+        'sort_by': 'By TEV Range - Custom',
         'tev_min': 75,
         'tev_max': 400,
     },
-    'metals_and_materials': {
-        'naics_codes': ['331', '332'],  # Primary Metals, Fabricated Metal Products
-        'tev_min': 50,
-        'tev_max': 500,
-    },
-    'industrial_services': {
-        'naics_codes': ['238', '561', '811'],  # Construction, Admin Services, Repair
+    'manufacturing_only': {
+        'business_category': 'Manufacturing',
+        'naics_codes': ['manufacturing'],
+        'sort_by': 'By TEV Range - Custom',
         'tev_min': 75,
         'tev_max': 400,
     },
     'full_lower_middle_market': {
+        'business_category': 'All',
+        'naics_codes': None,
+        'sort_by': 'By TEV Range - Custom',
         'tev_min': 75,
         'tev_max': 400,
     }
@@ -397,17 +698,10 @@ async def main():
     parser.add_argument('--profile', choices=list(QUERY_PROFILES.keys()), 
                         default='full_lower_middle_market',
                         help='Query profile to use')
-    parser.add_argument('--days-back', type=int, default=90,
-                        help='Number of days back to query')
-    parser.add_argument('--headless', action='store_true', default=True,
-                        help='Run browser in headless mode')
     
     args = parser.parse_args()
     
-    # Build query parameters
     query_params = QUERY_PROFILES[args.profile].copy()
-    query_params['deal_date_start'] = (datetime.now() - timedelta(days=args.days_back)).strftime('%Y-%m-%d')
-    query_params['deal_date_end'] = datetime.now().strftime('%Y-%m-%d')
     
     print(f"[GFData Bot] Starting extraction with profile: {args.profile}")
     print(f"[GFData Bot] Query params: {query_params}")
