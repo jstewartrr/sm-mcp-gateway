@@ -1,6 +1,5 @@
 """
-Google Drive MCP Server
-Provides full access to Google Drive files including Excel, PDF, PowerPoint, etc.
+Google Drive MCP Server with SSE transport for Claude.ai
 """
 
 import os
@@ -15,35 +14,19 @@ import pandas as pd
 from PyPDF2 import PdfReader
 from pptx import Presentation
 from docx import Document
-import openpyxl
 
 app = Flask(__name__)
 
-# Google Drive API setup
 SCOPES = ['https://www.googleapis.com/auth/drive.readonly']
 
 def get_drive_service():
-    """Initialize Google Drive service with service account credentials."""
     creds_json = os.environ.get('GOOGLE_SERVICE_ACCOUNT_JSON')
     if not creds_json:
         raise ValueError("GOOGLE_SERVICE_ACCOUNT_JSON environment variable not set")
-    
     creds_dict = json.loads(creds_json)
-    credentials = service_account.Credentials.from_service_account_info(
-        creds_dict, scopes=SCOPES
-    )
+    credentials = service_account.Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
     return build('drive', 'v3', credentials=credentials)
 
-# MCP Protocol Implementation
-def create_mcp_response(result):
-    """Format response according to MCP protocol."""
-    return jsonify(result)
-
-def create_error_response(error_msg, code=-1):
-    """Format error response."""
-    return jsonify({"error": {"code": code, "message": error_msg}})
-
-# Tool definitions
 TOOLS = [
     {
         "name": "list_folder_contents",
@@ -51,15 +34,8 @@ TOOLS = [
         "inputSchema": {
             "type": "object",
             "properties": {
-                "folder_id": {
-                    "type": "string",
-                    "description": "The Google Drive folder ID. Use 'root' for the root folder."
-                },
-                "page_size": {
-                    "type": "integer",
-                    "description": "Number of files to return (max 100)",
-                    "default": 50
-                }
+                "folder_id": {"type": "string", "description": "The Google Drive folder ID. Use 'root' for the root folder."},
+                "page_size": {"type": "integer", "description": "Number of files to return (max 100)", "default": 50}
             },
             "required": ["folder_id"]
         }
@@ -70,36 +46,21 @@ TOOLS = [
         "inputSchema": {
             "type": "object",
             "properties": {
-                "query": {
-                    "type": "string",
-                    "description": "Search query (file name or content)"
-                },
-                "folder_id": {
-                    "type": "string",
-                    "description": "Optional folder ID to limit search scope"
-                },
-                "file_type": {
-                    "type": "string",
-                    "description": "Filter by file type: spreadsheet, document, pdf, presentation, folder"
-                }
+                "query": {"type": "string", "description": "Search query (file name or content)"},
+                "folder_id": {"type": "string", "description": "Optional folder ID to limit search scope"},
+                "file_type": {"type": "string", "description": "Filter by file type: spreadsheet, document, pdf, presentation, folder"}
             },
             "required": ["query"]
         }
     },
     {
         "name": "read_excel_file",
-        "description": "Read an Excel file (.xlsx, .xls) and return its contents as JSON. Can read specific sheets.",
+        "description": "Read an Excel file (.xlsx, .xls) or Google Sheet and return its contents as JSON.",
         "inputSchema": {
             "type": "object",
             "properties": {
-                "file_id": {
-                    "type": "string",
-                    "description": "The Google Drive file ID"
-                },
-                "sheet_name": {
-                    "type": "string",
-                    "description": "Specific sheet name to read (optional, reads all if not specified)"
-                }
+                "file_id": {"type": "string", "description": "The Google Drive file ID"},
+                "sheet_name": {"type": "string", "description": "Specific sheet name to read (optional)"}
             },
             "required": ["file_id"]
         }
@@ -110,44 +71,27 @@ TOOLS = [
         "inputSchema": {
             "type": "object",
             "properties": {
-                "file_id": {
-                    "type": "string",
-                    "description": "The Google Drive file ID"
-                },
-                "page_numbers": {
-                    "type": "array",
-                    "items": {"type": "integer"},
-                    "description": "Specific page numbers to read (optional, reads all if not specified)"
-                }
+                "file_id": {"type": "string", "description": "The Google Drive file ID"},
+                "page_numbers": {"type": "array", "items": {"type": "integer"}, "description": "Specific pages to read"}
             },
             "required": ["file_id"]
         }
     },
     {
         "name": "read_powerpoint_file",
-        "description": "Read a PowerPoint file (.pptx) and extract text from all slides.",
+        "description": "Read a PowerPoint file (.pptx) or Google Slides and extract text from all slides.",
         "inputSchema": {
             "type": "object",
-            "properties": {
-                "file_id": {
-                    "type": "string",
-                    "description": "The Google Drive file ID"
-                }
-            },
+            "properties": {"file_id": {"type": "string", "description": "The Google Drive file ID"}},
             "required": ["file_id"]
         }
     },
     {
         "name": "read_word_file",
-        "description": "Read a Word document (.docx) and extract its text content.",
+        "description": "Read a Word document (.docx) or Google Doc and extract its text content.",
         "inputSchema": {
             "type": "object",
-            "properties": {
-                "file_id": {
-                    "type": "string",
-                    "description": "The Google Drive file ID"
-                }
-            },
+            "properties": {"file_id": {"type": "string", "description": "The Google Drive file ID"}},
             "required": ["file_id"]
         }
     },
@@ -156,47 +100,23 @@ TOOLS = [
         "description": "Read a text-based file (txt, csv, json, etc.) and return its contents.",
         "inputSchema": {
             "type": "object",
-            "properties": {
-                "file_id": {
-                    "type": "string",
-                    "description": "The Google Drive file ID"
-                }
-            },
+            "properties": {"file_id": {"type": "string", "description": "The Google Drive file ID"}},
             "required": ["file_id"]
         }
     },
     {
         "name": "get_file_metadata",
-        "description": "Get detailed metadata about a file including name, size, created date, modified date, owner, etc.",
+        "description": "Get detailed metadata about a file including name, size, created date, modified date, owner.",
         "inputSchema": {
             "type": "object",
-            "properties": {
-                "file_id": {
-                    "type": "string",
-                    "description": "The Google Drive file ID"
-                }
-            },
-            "required": ["file_id"]
-        }
-    },
-    {
-        "name": "download_file_base64",
-        "description": "Download a file and return its contents as base64 encoded string.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "file_id": {
-                    "type": "string",
-                    "description": "The Google Drive file ID"
-                }
-            },
+            "properties": {"file_id": {"type": "string", "description": "The Google Drive file ID"}},
             "required": ["file_id"]
         }
     }
 ]
 
+# Tool implementations
 def download_file(service, file_id):
-    """Download a file from Google Drive."""
     request = service.files().get_media(fileId=file_id)
     file_buffer = io.BytesIO()
     downloader = MediaIoBaseDownload(file_buffer, request)
@@ -207,7 +127,6 @@ def download_file(service, file_id):
     return file_buffer
 
 def export_google_file(service, file_id, mime_type):
-    """Export a Google Workspace file to specified format."""
     request = service.files().export_media(fileId=file_id, mimeType=mime_type)
     file_buffer = io.BytesIO()
     downloader = MediaIoBaseDownload(file_buffer, request)
@@ -217,350 +136,193 @@ def export_google_file(service, file_id, mime_type):
     file_buffer.seek(0)
     return file_buffer
 
-# Tool implementations
 def list_folder_contents(folder_id, page_size=50):
-    """List contents of a folder."""
     service = get_drive_service()
-    
     query = f"'{folder_id}' in parents and trashed = false"
-    
     results = service.files().list(
-        q=query,
-        pageSize=min(page_size, 100),
+        q=query, pageSize=min(page_size, 100),
         fields="files(id, name, mimeType, size, createdTime, modifiedTime, owners)"
     ).execute()
-    
     files = results.get('files', [])
-    
-    formatted_files = []
-    for f in files:
-        formatted_files.append({
-            "id": f.get('id'),
-            "name": f.get('name'),
-            "type": f.get('mimeType'),
-            "size": f.get('size', 'N/A'),
-            "created": f.get('createdTime'),
-            "modified": f.get('modifiedTime'),
-            "owner": f.get('owners', [{}])[0].get('emailAddress', 'Unknown')
-        })
-    
-    return {"files": formatted_files, "count": len(formatted_files)}
+    formatted = [{"id": f.get('id'), "name": f.get('name'), "type": f.get('mimeType'),
+                  "size": f.get('size', 'N/A'), "modified": f.get('modifiedTime')} for f in files]
+    return {"files": formatted, "count": len(formatted)}
 
 def search_files(query, folder_id=None, file_type=None):
-    """Search for files in Google Drive."""
     service = get_drive_service()
-    
     search_query = f"name contains '{query}' and trashed = false"
-    
     if folder_id:
         search_query += f" and '{folder_id}' in parents"
-    
-    mime_type_map = {
-        "spreadsheet": "application/vnd.google-apps.spreadsheet",
-        "document": "application/vnd.google-apps.document",
-        "pdf": "application/pdf",
-        "presentation": "application/vnd.google-apps.presentation",
-        "folder": "application/vnd.google-apps.folder",
-        "excel": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    }
-    
-    if file_type and file_type in mime_type_map:
-        search_query += f" and mimeType = '{mime_type_map[file_type]}'"
-    
-    results = service.files().list(
-        q=search_query,
-        pageSize=50,
-        fields="files(id, name, mimeType, size, modifiedTime, parents)"
-    ).execute()
-    
+    mime_map = {"spreadsheet": "application/vnd.google-apps.spreadsheet",
+                "document": "application/vnd.google-apps.document", "pdf": "application/pdf",
+                "presentation": "application/vnd.google-apps.presentation",
+                "folder": "application/vnd.google-apps.folder"}
+    if file_type and file_type in mime_map:
+        search_query += f" and mimeType = '{mime_map[file_type]}'"
+    results = service.files().list(q=search_query, pageSize=50,
+                                   fields="files(id, name, mimeType, size, modifiedTime)").execute()
     return {"files": results.get('files', []), "query": search_query}
 
 def read_excel_file(file_id, sheet_name=None):
-    """Read an Excel file and return contents as JSON."""
     service = get_drive_service()
-    
-    # Get file metadata to check type
     file_meta = service.files().get(fileId=file_id, fields="mimeType,name").execute()
     mime_type = file_meta.get('mimeType')
-    
-    # Handle Google Sheets - export as Excel
     if mime_type == 'application/vnd.google-apps.spreadsheet':
-        file_buffer = export_google_file(
-            service, file_id, 
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        )
+        file_buffer = export_google_file(service, file_id, 
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     else:
         file_buffer = download_file(service, file_id)
-    
-    # Read with pandas
     if sheet_name:
         df = pd.read_excel(file_buffer, sheet_name=sheet_name)
-        return {
-            "file_name": file_meta.get('name'),
-            "sheet": sheet_name,
-            "columns": list(df.columns),
-            "row_count": len(df),
-            "data": df.to_dict(orient='records')
-        }
+        return {"file_name": file_meta.get('name'), "sheet": sheet_name,
+                "columns": list(df.columns), "row_count": len(df), "data": df.head(100).to_dict(orient='records')}
     else:
-        # Read all sheets
         xlsx = pd.ExcelFile(file_buffer)
         sheets_data = {}
-        for sheet in xlsx.sheet_names:
+        for sheet in xlsx.sheet_names[:5]:
             df = pd.read_excel(xlsx, sheet_name=sheet)
-            sheets_data[sheet] = {
-                "columns": list(df.columns),
-                "row_count": len(df),
-                "data": df.to_dict(orient='records')
-            }
-        return {
-            "file_name": file_meta.get('name'),
-            "sheets": list(xlsx.sheet_names),
-            "data": sheets_data
-        }
+            sheets_data[sheet] = {"columns": list(df.columns), "row_count": len(df),
+                                  "data": df.head(50).to_dict(orient='records')}
+        return {"file_name": file_meta.get('name'), "sheets": list(xlsx.sheet_names), "data": sheets_data}
 
 def read_pdf_file(file_id, page_numbers=None):
-    """Read a PDF file and extract text."""
     service = get_drive_service()
     file_meta = service.files().get(fileId=file_id, fields="name").execute()
     file_buffer = download_file(service, file_id)
-    
     reader = PdfReader(file_buffer)
     total_pages = len(reader.pages)
-    
-    pages_to_read = page_numbers if page_numbers else range(total_pages)
-    
+    pages_to_read = page_numbers if page_numbers else range(min(total_pages, 20))
     text_content = []
     for page_num in pages_to_read:
         if 0 <= page_num < total_pages:
-            page = reader.pages[page_num]
-            text_content.append({
-                "page": page_num + 1,
-                "text": page.extract_text()
-            })
-    
-    return {
-        "file_name": file_meta.get('name'),
-        "total_pages": total_pages,
-        "pages_read": len(text_content),
-        "content": text_content
-    }
+            text_content.append({"page": page_num + 1, "text": reader.pages[page_num].extract_text()})
+    return {"file_name": file_meta.get('name'), "total_pages": total_pages, "content": text_content}
 
 def read_powerpoint_file(file_id):
-    """Read a PowerPoint file and extract text from slides."""
     service = get_drive_service()
-    
     file_meta = service.files().get(fileId=file_id, fields="mimeType,name").execute()
-    mime_type = file_meta.get('mimeType')
-    
-    # Handle Google Slides - export as PPTX
-    if mime_type == 'application/vnd.google-apps.presentation':
-        file_buffer = export_google_file(
-            service, file_id,
-            'application/vnd.openxmlformats-officedocument.presentationml.presentation'
-        )
+    if file_meta.get('mimeType') == 'application/vnd.google-apps.presentation':
+        file_buffer = export_google_file(service, file_id,
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation')
     else:
         file_buffer = download_file(service, file_id)
-    
     prs = Presentation(file_buffer)
-    
-    slides_content = []
+    slides = []
     for idx, slide in enumerate(prs.slides):
-        slide_text = []
-        for shape in slide.shapes:
-            if hasattr(shape, "text"):
-                slide_text.append(shape.text)
-        slides_content.append({
-            "slide_number": idx + 1,
-            "text": "\n".join(slide_text)
-        })
-    
-    return {
-        "file_name": file_meta.get('name'),
-        "total_slides": len(prs.slides),
-        "slides": slides_content
-    }
+        text = "\n".join([shape.text for shape in slide.shapes if hasattr(shape, "text")])
+        slides.append({"slide_number": idx + 1, "text": text})
+    return {"file_name": file_meta.get('name'), "total_slides": len(prs.slides), "slides": slides}
 
 def read_word_file(file_id):
-    """Read a Word document and extract text."""
     service = get_drive_service()
-    
     file_meta = service.files().get(fileId=file_id, fields="mimeType,name").execute()
-    mime_type = file_meta.get('mimeType')
-    
-    # Handle Google Docs - export as DOCX
-    if mime_type == 'application/vnd.google-apps.document':
-        file_buffer = export_google_file(
-            service, file_id,
-            'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-        )
+    if file_meta.get('mimeType') == 'application/vnd.google-apps.document':
+        file_buffer = export_google_file(service, file_id,
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
     else:
         file_buffer = download_file(service, file_id)
-    
     doc = Document(file_buffer)
-    
-    paragraphs = []
-    for para in doc.paragraphs:
-        if para.text.strip():
-            paragraphs.append(para.text)
-    
-    # Extract tables
-    tables_content = []
-    for table_idx, table in enumerate(doc.tables):
-        table_data = []
-        for row in table.rows:
-            row_data = [cell.text for cell in row.cells]
-            table_data.append(row_data)
-        tables_content.append({
-            "table_number": table_idx + 1,
-            "data": table_data
-        })
-    
-    return {
-        "file_name": file_meta.get('name'),
-        "paragraph_count": len(paragraphs),
-        "paragraphs": paragraphs,
-        "tables": tables_content
-    }
+    paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
+    return {"file_name": file_meta.get('name'), "paragraph_count": len(paragraphs), "paragraphs": paragraphs[:100]}
 
 def read_text_file(file_id):
-    """Read a text-based file."""
     service = get_drive_service()
     file_meta = service.files().get(fileId=file_id, fields="name,mimeType").execute()
     file_buffer = download_file(service, file_id)
-    
     content = file_buffer.read().decode('utf-8', errors='replace')
-    
-    return {
-        "file_name": file_meta.get('name'),
-        "mime_type": file_meta.get('mimeType'),
-        "content": content
-    }
+    return {"file_name": file_meta.get('name'), "content": content[:50000]}
 
 def get_file_metadata(file_id):
-    """Get detailed file metadata."""
     service = get_drive_service()
-    
-    file_meta = service.files().get(
-        fileId=file_id,
-        fields="id,name,mimeType,size,createdTime,modifiedTime,owners,parents,webViewLink,webContentLink"
-    ).execute()
-    
-    return {
-        "id": file_meta.get('id'),
-        "name": file_meta.get('name'),
-        "mime_type": file_meta.get('mimeType'),
-        "size_bytes": file_meta.get('size'),
-        "created": file_meta.get('createdTime'),
-        "modified": file_meta.get('modifiedTime'),
-        "owner": file_meta.get('owners', [{}])[0].get('emailAddress'),
-        "parent_folders": file_meta.get('parents', []),
-        "web_view_link": file_meta.get('webViewLink'),
-        "download_link": file_meta.get('webContentLink')
-    }
+    f = service.files().get(fileId=file_id,
+        fields="id,name,mimeType,size,createdTime,modifiedTime,owners,webViewLink").execute()
+    return {"id": f.get('id'), "name": f.get('name'), "mime_type": f.get('mimeType'),
+            "size": f.get('size'), "created": f.get('createdTime'), "modified": f.get('modifiedTime'),
+            "owner": f.get('owners', [{}])[0].get('emailAddress'), "web_link": f.get('webViewLink')}
 
-def download_file_base64(file_id):
-    """Download file and return as base64."""
-    service = get_drive_service()
-    file_meta = service.files().get(fileId=file_id, fields="name,mimeType,size").execute()
-    file_buffer = download_file(service, file_id)
-    
-    content = file_buffer.read()
-    base64_content = base64.b64encode(content).decode('utf-8')
-    
-    return {
-        "file_name": file_meta.get('name'),
-        "mime_type": file_meta.get('mimeType'),
-        "size_bytes": file_meta.get('size'),
-        "base64_content": base64_content
-    }
+def execute_tool(name, args):
+    if name == 'list_folder_contents':
+        return list_folder_contents(args.get('folder_id'), args.get('page_size', 50))
+    elif name == 'search_files':
+        return search_files(args.get('query'), args.get('folder_id'), args.get('file_type'))
+    elif name == 'read_excel_file':
+        return read_excel_file(args.get('file_id'), args.get('sheet_name'))
+    elif name == 'read_pdf_file':
+        return read_pdf_file(args.get('file_id'), args.get('page_numbers'))
+    elif name == 'read_powerpoint_file':
+        return read_powerpoint_file(args.get('file_id'))
+    elif name == 'read_word_file':
+        return read_word_file(args.get('file_id'))
+    elif name == 'read_text_file':
+        return read_text_file(args.get('file_id'))
+    elif name == 'get_file_metadata':
+        return get_file_metadata(args.get('file_id'))
+    else:
+        raise ValueError(f"Unknown tool: {name}")
 
-# Route handlers
-@app.route('/mcp', methods=['GET', 'POST'])
-def mcp_endpoint():
-    """Main MCP endpoint."""
-    if request.method == 'GET':
-        return jsonify({
-            "name": "google-drive-mcp",
-            "version": "1.0.0",
-            "description": "Google Drive MCP Server - Full file access including Excel, PDF, PowerPoint",
-            "tools": TOOLS
-        })
+# SSE endpoint for Claude.ai MCP
+@app.route('/sse', methods=['GET'])
+def mcp_sse():
+    """SSE endpoint for MCP protocol - Claude.ai connects here"""
+    def generate():
+        # Send endpoint info for client to POST to
+        endpoint_event = {
+            "jsonrpc": "2.0",
+            "method": "endpoint",
+            "params": {"url": "/messages"}
+        }
+        yield f"event: endpoint\ndata: {json.dumps(endpoint_event)}\n\n"
+        
+        # Keep connection alive
+        import time
+        while True:
+            yield f": keepalive\n\n"
+            time.sleep(30)
     
-    # Handle POST requests
+    return Response(generate(), mimetype='text/event-stream',
+                    headers={'Cache-Control': 'no-cache', 'Connection': 'keep-alive',
+                             'Access-Control-Allow-Origin': '*'})
+
+@app.route('/messages', methods=['POST'])
+def mcp_messages():
+    """Handle MCP JSON-RPC requests"""
     data = request.get_json()
-    
     if not data:
-        return create_error_response("No JSON data provided")
+        return jsonify({"jsonrpc": "2.0", "error": {"code": -32700, "message": "Parse error"}, "id": None})
     
     method = data.get('method')
     params = data.get('params', {})
+    req_id = data.get('id')
     
-    if method == 'tools/list':
-        return jsonify({"tools": TOOLS})
-    
-    elif method == 'tools/call':
-        tool_name = params.get('name')
-        tool_args = params.get('arguments', {})
+    try:
+        if method == 'initialize':
+            result = {
+                "protocolVersion": "2024-11-05",
+                "serverInfo": {"name": "google-drive-mcp", "version": "1.0.0"},
+                "capabilities": {"tools": {}}
+            }
+        elif method == 'tools/list':
+            result = {"tools": TOOLS}
+        elif method == 'tools/call':
+            tool_name = params.get('name')
+            tool_args = params.get('arguments', {})
+            tool_result = execute_tool(tool_name, tool_args)
+            result = {"content": [{"type": "text", "text": json.dumps(tool_result, indent=2, default=str)}]}
+        else:
+            return jsonify({"jsonrpc": "2.0", "error": {"code": -32601, "message": f"Method not found: {method}"}, "id": req_id})
         
-        try:
-            if tool_name == 'list_folder_contents':
-                result = list_folder_contents(
-                    tool_args.get('folder_id'),
-                    tool_args.get('page_size', 50)
-                )
-            elif tool_name == 'search_files':
-                result = search_files(
-                    tool_args.get('query'),
-                    tool_args.get('folder_id'),
-                    tool_args.get('file_type')
-                )
-            elif tool_name == 'read_excel_file':
-                result = read_excel_file(
-                    tool_args.get('file_id'),
-                    tool_args.get('sheet_name')
-                )
-            elif tool_name == 'read_pdf_file':
-                result = read_pdf_file(
-                    tool_args.get('file_id'),
-                    tool_args.get('page_numbers')
-                )
-            elif tool_name == 'read_powerpoint_file':
-                result = read_powerpoint_file(tool_args.get('file_id'))
-            elif tool_name == 'read_word_file':
-                result = read_word_file(tool_args.get('file_id'))
-            elif tool_name == 'read_text_file':
-                result = read_text_file(tool_args.get('file_id'))
-            elif tool_name == 'get_file_metadata':
-                result = get_file_metadata(tool_args.get('file_id'))
-            elif tool_name == 'download_file_base64':
-                result = download_file_base64(tool_args.get('file_id'))
-            else:
-                return create_error_response(f"Unknown tool: {tool_name}")
-            
-            return jsonify({"content": [{"type": "text", "text": json.dumps(result, indent=2, default=str)}]})
-        
-        except Exception as e:
-            return create_error_response(str(e))
+        return jsonify({"jsonrpc": "2.0", "result": result, "id": req_id})
     
-    return create_error_response("Unknown method")
+    except Exception as e:
+        return jsonify({"jsonrpc": "2.0", "error": {"code": -32000, "message": str(e)}, "id": req_id})
 
 @app.route('/health', methods=['GET'])
-def health_check():
-    """Health check endpoint."""
+def health():
     return jsonify({"status": "healthy", "service": "google-drive-mcp"})
 
 @app.route('/', methods=['GET'])
 def root():
-    """Root endpoint."""
-    return jsonify({
-        "service": "Google Drive MCP Server",
-        "version": "1.0.0",
-        "endpoints": {
-            "/mcp": "MCP protocol endpoint",
-            "/health": "Health check"
-        }
-    })
+    return jsonify({"service": "Google Drive MCP Server", "version": "1.0.0", "sse_endpoint": "/sse", "messages_endpoint": "/messages"})
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
