@@ -1,12 +1,12 @@
 """
-GF Data Automation Bot v3.3
+GF Data Automation Bot v3.4
 ===========================
 Automated extraction of PE transaction data from GF Data portal.
 Uses Playwright for browser automation and Snowflake for data storage.
 
 Author: Sovereign Mind Intelligence System
 Created: December 2024
-Updated: December 2024 - Fixed mixed data type column handling for Snowflake load
+Updated: December 2024 - v3.4 Load to GFDATA_RAW staging table with DROP/CREATE
 """
 
 import asyncio
@@ -594,8 +594,8 @@ class GFDataBot:
         
         df = pd.read_excel(filepath)
         
-        # Standardize column names
-        df.columns = [str(col).strip().upper().replace(' ', '_').replace('/', '_') for col in df.columns]
+        # Standardize column names - make SQL-safe
+        df.columns = [str(col).strip().upper().replace(' ', '_').replace('/', '_').replace('-', '_') for col in df.columns]
         
         # CRITICAL FIX: Convert all columns to strings to avoid mixed type errors
         # This handles the "ALL" column and any other columns with mixed types
@@ -610,7 +610,7 @@ class GFDataBot:
         df['EXTRACTED_AT'] = datetime.now().isoformat()
         df['SOURCE_ID'] = str(self._get_gfdata_source_id())
         
-        print(f"[GFData Bot] Parsed {len(df)} records")
+        print(f"[GFData Bot] Parsed {len(df)} records with columns: {list(df.columns)}")
         return df
     
     def _get_gfdata_source_id(self) -> int:
@@ -628,18 +628,28 @@ class GFDataBot:
         finally:
             cursor.close()
     
-    def load_to_snowflake(self, df: pd.DataFrame, table_name: str = 'GFDATA_TRANSACTIONS'):
-        """Load parsed data to Snowflake."""
+    def load_to_snowflake(self, df: pd.DataFrame, table_name: str = 'GFDATA_RAW'):
+        """
+        Load parsed data to Snowflake staging table.
+        
+        Uses DROP/CREATE to handle schema changes from Excel exports.
+        Raw data goes to GFDATA_RAW for later transformation to GFDATA_TRANSACTIONS.
+        """
         print(f"[GFData Bot] Loading {len(df)} records to HURRICANE.MARKET_INTEL.{table_name}")
         
         cursor = self.snowflake_conn.cursor()
         
         try:
-            # All columns are now VARCHAR due to our type standardization
+            # Drop existing table to handle schema changes
+            print(f"[GFData Bot] Dropping existing {table_name} table if exists...")
+            cursor.execute(f"DROP TABLE IF EXISTS HURRICANE.MARKET_INTEL.{table_name}")
+            
+            # Build column definitions - all VARCHAR for raw data
             columns_sql = ', '.join([f'"{col}" VARCHAR' for col in df.columns])
             
+            print(f"[GFData Bot] Creating {table_name} with {len(df.columns)} columns...")
             cursor.execute(f"""
-                CREATE TABLE IF NOT EXISTS HURRICANE.MARKET_INTEL.{table_name} (
+                CREATE TABLE HURRICANE.MARKET_INTEL.{table_name} (
                     {columns_sql},
                     LOADED_AT TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
                 )
@@ -660,6 +670,10 @@ class GFDataBot:
             print(f"[GFData Bot] Loaded {nrows} rows in {nchunks} chunks")
             self._log_scrape_job(len(df), table_name)
             
+        except Exception as e:
+            print(f"[GFData Bot] Error loading to Snowflake: {e}")
+            raise
+            
         finally:
             cursor.close()
     
@@ -673,7 +687,7 @@ class GFDataBot:
                 (source_id, job_type, job_status, started_at, completed_at, 
                  reports_found, reports_new, scraper_version, execution_environment)
                 VALUES (%s, 'SCHEDULED', 'COMPLETED', CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(),
-                        %s, %s, '3.3.0', 'PLAYWRIGHT_BOT')
+                        %s, %s, '3.4.0', 'PLAYWRIGHT_BOT')
             """, (source_id, records_loaded, records_loaded))
             self.snowflake_conn.commit()
         except:
