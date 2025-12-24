@@ -1,13 +1,7 @@
 """
-Sovereign Mind MCP Gateway
-===========================
-A unified MCP server that proxies requests to multiple backend MCP servers.
-Provides ABBI and other voice interfaces with single-connection access to the entire SM ecosystem.
-
-Supports both HTTP POST (/mcp) and SSE (/sse) transports.
-
-Architecture:
-    ABBI → SM Gateway → [Snowflake, Asana, Make, GitHub, Gemini, Google Drive, ...]
+Sovereign Mind MCP Gateway v1.2.0
+=================================
+A unified MCP server with integrated web scraper support.
 """
 
 import os
@@ -16,13 +10,12 @@ import asyncio
 import httpx
 import uuid
 import queue
-import threading
+import subprocess
+import sys
 from flask import Flask, request, jsonify, Response
-from functools import wraps
 import logging
 from datetime import datetime
 
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -44,18 +37,6 @@ BACKEND_MCPS = {
         "prefix": "drive",
         "description": "Google Drive file access (service account)",
         "enabled": True
-    },
-    "asana": {
-        "url": os.environ.get("MCP_ASANA_URL", "https://mcp.asana.com/sse"),
-        "prefix": "asana",
-        "description": "Asana task and project management",
-        "enabled": False  # Disabled - requires OAuth, use direct connection
-    },
-    "make": {
-        "url": os.environ.get("MCP_MAKE_URL", "https://mcp.make.com"),
-        "prefix": "make",
-        "description": "Make.com automation scenarios",
-        "enabled": False  # Disabled - requires OAuth
     },
     "github": {
         "url": os.environ.get("MCP_GITHUB_URL", "https://github-mcp.redglacier-26075659.eastus.azurecontainerapps.io/mcp"),
@@ -118,12 +99,10 @@ BACKEND_MCPS = {
 # =============================================================================
 
 class ToolCatalog:
-    """Manages the unified tool catalog from all backend MCPs."""
-    
     def __init__(self):
-        self.tools = {}  # prefixed_name -> {backend, original_name, schema}
+        self.tools = {}
         self.last_refresh = None
-        self.refresh_interval = 300  # 5 minutes
+        self.refresh_interval = 300
     
     def needs_refresh(self):
         if self.last_refresh is None:
@@ -131,7 +110,6 @@ class ToolCatalog:
         return (datetime.now() - self.last_refresh).seconds > self.refresh_interval
     
     async def refresh(self):
-        """Fetch tool schemas from all enabled backend MCPs."""
         logger.info("Refreshing tool catalog from backend MCPs...")
         new_tools = {}
         
@@ -141,15 +119,9 @@ class ToolCatalog:
                     continue
                 
                 try:
-                    # Fetch tools/list from backend
                     response = await client.post(
                         config["url"],
-                        json={
-                            "jsonrpc": "2.0",
-                            "id": 1,
-                            "method": "tools/list",
-                            "params": {}
-                        },
+                        json={"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}},
                         headers={"Content-Type": "application/json"}
                     )
                     
@@ -161,7 +133,6 @@ class ToolCatalog:
                         for tool in tools:
                             original_name = tool["name"]
                             prefixed_name = f"{prefix}_{original_name}"
-                            
                             new_tools[prefixed_name] = {
                                 "backend": backend_name,
                                 "backend_url": config["url"],
@@ -172,39 +143,30 @@ class ToolCatalog:
                                     "inputSchema": tool.get("inputSchema", {})
                                 }
                             }
-                        
-                        logger.info(f"  ✓ {backend_name}: {len(tools)} tools loaded")
+                        logger.info(f"  OK {backend_name}: {len(tools)} tools loaded")
                     else:
-                        logger.warning(f"  ✗ {backend_name}: HTTP {response.status_code}")
-                        
+                        logger.warning(f"  FAIL {backend_name}: HTTP {response.status_code}")
                 except Exception as e:
-                    logger.warning(f"  ✗ {backend_name}: {str(e)}")
+                    logger.warning(f"  FAIL {backend_name}: {str(e)}")
         
         self.tools = new_tools
         self.last_refresh = datetime.now()
         logger.info(f"Tool catalog refreshed: {len(self.tools)} total tools")
     
     def get_all_tools(self):
-        """Return all tool schemas for tools/list response."""
         return [t["schema"] for t in self.tools.values()]
     
     def get_tool(self, prefixed_name):
-        """Get tool info by prefixed name."""
         return self.tools.get(prefixed_name)
 
-
-# Global catalog instance
 catalog = ToolCatalog()
-
-# SSE session management
-sse_sessions = {}  # session_id -> queue
+sse_sessions = {}
 
 # =============================================================================
 # MCP PROTOCOL HANDLERS
 # =============================================================================
 
 def run_async(coro):
-    """Helper to run async code from sync Flask handlers."""
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:
@@ -212,106 +174,54 @@ def run_async(coro):
     finally:
         loop.close()
 
-
 async def call_backend_tool(backend_url: str, tool_name: str, arguments: dict):
-    """Forward a tool call to a backend MCP server."""
     async with httpx.AsyncClient(timeout=60.0) as client:
         response = await client.post(
             backend_url,
-            json={
-                "jsonrpc": "2.0",
-                "id": 1,
-                "method": "tools/call",
-                "params": {
-                    "name": tool_name,
-                    "arguments": arguments
-                }
-            },
+            json={"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": tool_name, "arguments": arguments}},
             headers={"Content-Type": "application/json"}
         )
         return response.json()
 
-
 def handle_initialize(params):
-    """Handle MCP initialize request."""
     return {
         "protocolVersion": "2024-11-05",
-        "capabilities": {
-            "tools": {"listChanged": True}
-        },
-        "serverInfo": {
-            "name": "sovereign-mind-gateway",
-            "version": "1.1.0"
-        }
+        "capabilities": {"tools": {"listChanged": True}},
+        "serverInfo": {"name": "sovereign-mind-gateway", "version": "1.2.0"}
     }
 
-
 def handle_tools_list(params):
-    """Handle tools/list request - return unified catalog."""
     if catalog.needs_refresh():
         run_async(catalog.refresh())
-    
     return {"tools": catalog.get_all_tools()}
 
-
 def handle_tools_call(params):
-    """Handle tools/call request - route to appropriate backend."""
     tool_name = params.get("name", "")
     arguments = params.get("arguments", {})
     
-    # Look up tool in catalog
     tool_info = catalog.get_tool(tool_name)
     if not tool_info:
-        return {
-            "content": [{
-                "type": "text",
-                "text": f"Error: Unknown tool '{tool_name}'"
-            }],
-            "isError": True
-        }
+        return {"content": [{"type": "text", "text": f"Error: Unknown tool '{tool_name}'"}], "isError": True}
     
-    # Forward to backend
     try:
-        result = run_async(call_backend_tool(
-            tool_info["backend_url"],
-            tool_info["original_name"],
-            arguments
-        ))
-        
-        # Extract result from JSON-RPC response
+        result = run_async(call_backend_tool(tool_info["backend_url"], tool_info["original_name"], arguments))
         if "result" in result:
             return result["result"]
         elif "error" in result:
-            return {
-                "content": [{
-                    "type": "text",
-                    "text": f"Backend error: {result['error']}"
-                }],
-                "isError": True
-            }
+            return {"content": [{"type": "text", "text": f"Backend error: {result['error']}"}], "isError": True}
         else:
             return result
-            
     except Exception as e:
         logger.error(f"Error calling backend tool: {e}")
-        return {
-            "content": [{
-                "type": "text",
-                "text": f"Error calling tool: {str(e)}"
-            }],
-            "isError": True
-        }
-
+        return {"content": [{"type": "text", "text": f"Error calling tool: {str(e)}"}], "isError": True}
 
 def process_mcp_message(data):
-    """Process an MCP JSON-RPC message and return the response."""
     method = data.get("method", "")
     params = data.get("params", {})
     request_id = data.get("id", 1)
     
     logger.info(f"MCP request: {method}")
     
-    # Route to appropriate handler
     if method == "initialize":
         result = handle_initialize(params)
     elif method == "tools/list":
@@ -321,18 +231,9 @@ def process_mcp_message(data):
     elif method == "notifications/initialized":
         return {"jsonrpc": "2.0", "id": request_id, "result": {}}
     else:
-        return {
-            "jsonrpc": "2.0",
-            "id": request_id,
-            "error": {"code": -32601, "message": f"Method not found: {method}"}
-        }
+        return {"jsonrpc": "2.0", "id": request_id, "error": {"code": -32601, "message": f"Method not found: {method}"}}
     
-    return {
-        "jsonrpc": "2.0",
-        "id": request_id,
-        "result": result
-    }
-
+    return {"jsonrpc": "2.0", "id": request_id, "result": result}
 
 # =============================================================================
 # FLASK ROUTES
@@ -340,120 +241,77 @@ def process_mcp_message(data):
 
 @app.route("/", methods=["GET"])
 def health_check():
-    """Health check endpoint."""
     return jsonify({
         "status": "healthy",
         "service": "sovereign-mind-gateway",
-        "version": "1.1.0",
-        "transports": ["http (/mcp)", "sse (/sse)"],
-        "backends": {
-            name: {
-                "enabled": cfg.get("enabled", False),
-                "prefix": cfg.get("prefix", "")
+        "version": "1.2.0",
+        "features": ["mcp-proxy", "sse-transport", "web-scrapers"],
+        "scrapers": {
+            "gfdata": {
+                "path": "/app/scrapers/gfdata/gfdata_bot.py",
+                "profiles": ["mgc_core", "distribution_only", "manufacturing_only", "full_lower_middle_market"],
+                "trigger": "POST /scrapers/gfdata/run"
             }
-            for name, cfg in BACKEND_MCPS.items()
         },
         "total_tools": len(catalog.tools) if catalog.tools else "not yet loaded"
     })
 
-
 @app.route("/mcp", methods=["POST"])
 def mcp_handler():
-    """Main MCP JSON-RPC endpoint (HTTP POST transport)."""
     try:
         data = request.get_json()
-        
         if not data:
-            return jsonify({
-                "jsonrpc": "2.0",
-                "id": None,
-                "error": {"code": -32700, "message": "Parse error"}
-            }), 400
-        
+            return jsonify({"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": "Parse error"}}), 400
         response = process_mcp_message(data)
         return jsonify(response)
-        
     except Exception as e:
         logger.error(f"MCP handler error: {e}")
-        return jsonify({
-            "jsonrpc": "2.0",
-            "id": data.get("id", 1) if data else 1,
-            "error": {"code": -32603, "message": str(e)}
-        }), 500
-
+        return jsonify({"jsonrpc": "2.0", "id": data.get("id", 1) if data else 1, "error": {"code": -32603, "message": str(e)}}), 500
 
 @app.route("/sse", methods=["GET"])
 def sse_connect():
-    """SSE endpoint - establishes event stream connection."""
     session_id = str(uuid.uuid4())
     sse_sessions[session_id] = queue.Queue()
-    
     logger.info(f"SSE connection established: {session_id}")
     
     def generate():
-        # Send the endpoint URL for POST messages
         yield f"event: endpoint\ndata: /sse/{session_id}/message\n\n"
-        
-        # Keep connection alive and send any queued responses
         while True:
             try:
-                # Wait for messages with timeout for keepalive
                 try:
                     message = sse_sessions[session_id].get(timeout=30)
                     yield f"event: message\ndata: {json.dumps(message)}\n\n"
                 except queue.Empty:
-                    # Send keepalive comment
                     yield ": keepalive\n\n"
             except GeneratorExit:
                 break
             except Exception as e:
                 logger.error(f"SSE error: {e}")
                 break
-        
-        # Cleanup
         if session_id in sse_sessions:
             del sse_sessions[session_id]
         logger.info(f"SSE connection closed: {session_id}")
     
-    return Response(
-        generate(),
-        mimetype="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no"
-        }
-    )
-
+    return Response(generate(), mimetype="text/event-stream",
+                   headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"})
 
 @app.route("/sse/<session_id>/message", methods=["POST"])
 def sse_message(session_id):
-    """Handle incoming messages for an SSE session."""
     if session_id not in sse_sessions:
         return jsonify({"error": "Session not found"}), 404
-    
     try:
         data = request.get_json()
-        
         if not data:
             return jsonify({"error": "No data"}), 400
-        
-        # Process the MCP message
         response = process_mcp_message(data)
-        
-        # Queue the response to be sent via SSE
         sse_sessions[session_id].put(response)
-        
         return jsonify({"status": "ok"})
-        
     except Exception as e:
         logger.error(f"SSE message error: {e}")
         return jsonify({"error": str(e)}), 500
 
-
 @app.route("/refresh", methods=["POST"])
 def force_refresh():
-    """Force refresh the tool catalog."""
     run_async(catalog.refresh())
     return jsonify({
         "status": "refreshed",
@@ -461,13 +319,10 @@ def force_refresh():
         "timestamp": catalog.last_refresh.isoformat() if catalog.last_refresh else None
     })
 
-
 @app.route("/tools", methods=["GET"])
 def list_tools():
-    """Human-readable tool listing."""
     if catalog.needs_refresh():
         run_async(catalog.refresh())
-    
     tools_by_backend = {}
     for name, info in catalog.tools.items():
         backend = info["backend"]
@@ -478,21 +333,127 @@ def list_tools():
             "original_name": info["original_name"],
             "description": info["schema"].get("description", "")
         })
-    
-    return jsonify({
-        "total_tools": len(catalog.tools),
-        "backends": tools_by_backend
-    })
+    return jsonify({"total_tools": len(catalog.tools), "backends": tools_by_backend})
 
+# =============================================================================
+# SCRAPER ENDPOINTS
+# =============================================================================
+
+@app.route("/scrapers/gfdata/run", methods=["POST"])
+def run_gfdata_scraper():
+    """
+    Trigger the GF Data scraper.
+    
+    POST body (optional):
+    {
+        "profile": "mgc_core|distribution_only|manufacturing_only|full_lower_middle_market"
+    }
+    """
+    profile = request.json.get("profile", "mgc_core") if request.json else "mgc_core"
+    valid_profiles = ["mgc_core", "distribution_only", "manufacturing_only", "full_lower_middle_market"]
+    
+    if profile not in valid_profiles:
+        return jsonify({"error": f"Invalid profile. Must be one of: {valid_profiles}"}), 400
+    
+    logger.info(f"Starting GF Data scraper with profile: {profile}")
+    
+    try:
+        bot_path = "/app/scrapers/gfdata/gfdata_bot.py"
+        
+        if not os.path.exists(bot_path):
+            return jsonify({
+                "error": "Scraper not found",
+                "path": bot_path,
+                "hint": "Container needs rebuild with scrapers directory"
+            }), 404
+        
+        result = subprocess.run(
+            [sys.executable, bot_path, "--profile", profile],
+            capture_output=True,
+            text=True,
+            timeout=600,
+            env={**os.environ}
+        )
+        
+        return jsonify({
+            "status": "completed" if result.returncode == 0 else "failed",
+            "profile": profile,
+            "returncode": result.returncode,
+            "stdout": result.stdout[-5000:] if result.stdout else None,
+            "stderr": result.stderr[-2000:] if result.stderr else None
+        })
+        
+    except subprocess.TimeoutExpired:
+        return jsonify({"status": "timeout", "error": "Scraper exceeded 10 minute timeout"}), 504
+    except Exception as e:
+        logger.error(f"Scraper error: {e}")
+        return jsonify({"status": "error", "error": str(e)}), 500
+
+@app.route("/scrapers/gfdata/status", methods=["GET"])
+def gfdata_status():
+    """Check GF Data scraper status and last run info."""
+    import snowflake.connector
+    
+    try:
+        conn = snowflake.connector.connect(
+            user=os.environ.get('SNOWFLAKE_USER', 'JOHN_CLAUDE'),
+            password=os.environ.get('SNOWFLAKE_PASSWORD'),
+            account=os.environ.get('SNOWFLAKE_ACCOUNT'),
+            warehouse=os.environ.get('SNOWFLAKE_WAREHOUSE', 'SOVEREIGN_MIND_WH'),
+            database='HURRICANE',
+            schema='MARKET_INTEL'
+        )
+        
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT job_id, source_name, status, records_scraped, records_loaded, 
+                   error_message, started_at, completed_at
+            FROM SCRAPE_JOBS 
+            WHERE source_name = 'GF Data'
+            ORDER BY started_at DESC LIMIT 5
+        """)
+        jobs = cursor.fetchall()
+        
+        try:
+            cursor.execute("SELECT COUNT(*) FROM GFDATA_RAW")
+            record_count = cursor.fetchone()[0]
+        except:
+            record_count = 0
+        
+        cursor.close()
+        conn.close()
+        
+        return jsonify({
+            "scraper": "gfdata",
+            "bot_path": "/app/scrapers/gfdata/gfdata_bot.py",
+            "bot_exists": os.path.exists("/app/scrapers/gfdata/gfdata_bot.py"),
+            "total_records": record_count,
+            "recent_jobs": [
+                {
+                    "job_id": str(j[0]),
+                    "source": j[1],
+                    "status": j[2],
+                    "records_scraped": j[3],
+                    "records_loaded": j[4],
+                    "error": j[5],
+                    "started_at": j[6].isoformat() if j[6] else None,
+                    "completed_at": j[7].isoformat() if j[7] else None
+                }
+                for j in jobs
+            ] if jobs else []
+        })
+        
+    except Exception as e:
+        logger.error(f"Status check error: {e}")
+        return jsonify({"error": str(e)}), 500
 
 # =============================================================================
 # MAIN
 # =============================================================================
 
 if __name__ == "__main__":
-    # Pre-load tool catalog on startup
-    logger.info("Sovereign Mind MCP Gateway starting...")
+    logger.info("Sovereign Mind MCP Gateway v1.2.0 starting...")
     run_async(catalog.refresh())
-    
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
