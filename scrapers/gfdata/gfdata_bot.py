@@ -1,12 +1,12 @@
 """
-GF Data Automation Bot v3.2
+GF Data Automation Bot v3.3
 ===========================
 Automated extraction of PE transaction data from GF Data portal.
 Uses Playwright for browser automation and Snowflake for data storage.
 
 Author: Sovereign Mind Intelligence System
 Created: December 2024
-Updated: December 2024 - Fixed javascript:void(0) export button handling
+Updated: December 2024 - Fixed mixed data type column handling for Snowflake load
 """
 
 import asyncio
@@ -298,7 +298,6 @@ class GFDataBot:
             print(f"  TEV Range: ${tev_min}M - ${tev_max}M")
         
         # 1. Select Business Category dropdown
-        # Look for select element with "Business Category" label nearby
         try:
             category_selectors = [
                 'select:near(:text("Business Category"))',
@@ -598,10 +597,18 @@ class GFDataBot:
         # Standardize column names
         df.columns = [str(col).strip().upper().replace(' ', '_').replace('/', '_') for col in df.columns]
         
+        # CRITICAL FIX: Convert all columns to strings to avoid mixed type errors
+        # This handles the "ALL" column and any other columns with mixed types
+        for col in df.columns:
+            df[col] = df[col].astype(str)
+            # Replace 'nan' strings with None for proper NULL handling
+            df[col] = df[col].replace('nan', None)
+            df[col] = df[col].replace('None', None)
+        
         # Add metadata
         df['SOURCE_FILE'] = filepath.name
-        df['EXTRACTED_AT'] = datetime.now()
-        df['SOURCE_ID'] = self._get_gfdata_source_id()
+        df['EXTRACTED_AT'] = datetime.now().isoformat()
+        df['SOURCE_ID'] = str(self._get_gfdata_source_id())
         
         print(f"[GFData Bot] Parsed {len(df)} records")
         return df
@@ -628,14 +635,8 @@ class GFDataBot:
         cursor = self.snowflake_conn.cursor()
         
         try:
-            columns_sql = ', '.join([
-                f'"{col}" VARCHAR' if df[col].dtype == 'object' 
-                else f'"{col}" FLOAT' if df[col].dtype in ['float64', 'float32']
-                else f'"{col}" INTEGER' if df[col].dtype in ['int64', 'int32']
-                else f'"{col}" TIMESTAMP_NTZ' if 'datetime' in str(df[col].dtype)
-                else f'"{col}" VARCHAR'
-                for col in df.columns
-            ])
+            # All columns are now VARCHAR due to our type standardization
+            columns_sql = ', '.join([f'"{col}" VARCHAR' for col in df.columns])
             
             cursor.execute(f"""
                 CREATE TABLE IF NOT EXISTS HURRICANE.MARKET_INTEL.{table_name} (
@@ -672,7 +673,7 @@ class GFDataBot:
                 (source_id, job_type, job_status, started_at, completed_at, 
                  reports_found, reports_new, scraper_version, execution_environment)
                 VALUES (%s, 'SCHEDULED', 'COMPLETED', CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(),
-                        %s, %s, '3.2.0', 'PLAYWRIGHT_BOT')
+                        %s, %s, '3.3.0', 'PLAYWRIGHT_BOT')
             """, (source_id, records_loaded, records_loaded))
             self.snowflake_conn.commit()
         except:
