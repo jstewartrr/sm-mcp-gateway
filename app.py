@@ -7,7 +7,7 @@ Provides ABBI and other voice interfaces with single-connection access to the en
 Supports both HTTP POST (/mcp) and SSE (/sse) transports.
 
 Architecture:
-    ABBI → SM Gateway → [Snowflake, Asana, Make, GitHub, Gemini, ...]
+    ABBI → SM Gateway → [Snowflake, Asana, Make, GitHub, Gemini, Google Drive, ...]
 """
 
 import os
@@ -37,6 +37,12 @@ BACKEND_MCPS = {
         "url": os.environ.get("MCP_SNOWFLAKE_URL", "https://john-claude-mcp.wittyplant-239da1c3.eastus.azurecontainerapps.io/mcp"),
         "prefix": "sm",
         "description": "Sovereign Mind Snowflake database (JOHN_CLAUDE user)",
+        "enabled": True
+    },
+    "googledrive": {
+        "url": os.environ.get("MCP_GOOGLEDRIVE_URL", "https://google-drive-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
+        "prefix": "drive",
+        "description": "Google Drive file access (service account)",
         "enabled": True
     },
     "asana": {
@@ -235,7 +241,7 @@ def handle_initialize(params):
         },
         "serverInfo": {
             "name": "sovereign-mind-gateway",
-            "version": "1.0.0"
+            "version": "1.1.0"
         }
     }
 
@@ -338,7 +344,7 @@ def health_check():
     return jsonify({
         "status": "healthy",
         "service": "sovereign-mind-gateway",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "transports": ["http (/mcp)", "sse (/sse)"],
         "backends": {
             name: {
