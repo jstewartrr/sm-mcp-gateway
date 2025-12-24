@@ -1,23 +1,24 @@
 """
-GF Data Automation Bot v3.4
+GF Data Automation Bot v3.5
 ===========================
 Automated extraction of PE transaction data from GF Data portal.
 Uses Playwright for browser automation and Snowflake for data storage.
 
 Author: Sovereign Mind Intelligence System
 Created: December 2024
-Updated: December 2024 - v3.4 Load to GFDATA_RAW staging table with DROP/CREATE
+Updated: December 2024 - v3.5 CDP network interception for javascript:void(0) downloads
 """
 
 import asyncio
 import os
 import json
+import base64
 import pandas as pd
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional, Dict, List, Any
 import snowflake.connector
-from playwright.async_api import async_playwright, Page, Browser
+from playwright.async_api import async_playwright, Page, Browser, CDPSession
 
 # Configuration
 GFDATA_LOGIN_URL = "https://gfdata.sigmify.com/signin.html"
@@ -51,6 +52,7 @@ class GFDataBot:
     
     Features:
     - Browser automation via Playwright
+    - CDP network interception for javascript:void(0) downloads
     - Excel download and parsing
     - Direct load to Snowflake MARKET_INTEL schema
     """
@@ -58,8 +60,13 @@ class GFDataBot:
     def __init__(self):
         self.browser: Optional[Browser] = None
         self.page: Optional[Page] = None
+        self.cdp_session: Optional[CDPSession] = None
         self.download_dir = DOWNLOAD_DIR
         self.download_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Track intercepted downloads
+        self._intercepted_downloads = {}
+        self._download_complete = asyncio.Event()
         
         # Snowflake connection for data loading
         self.snowflake_conn = snowflake.connector.connect(
@@ -76,7 +83,7 @@ class GFDataBot:
         cursor.execute(f"USE WAREHOUSE {os.environ.get('SNOWFLAKE_WAREHOUSE', 'SOVEREIGN_MIND_WH')}")
         cursor.close()
         
-        print(f"[GFData Bot] Initialized - Snowflake connected")
+        print(f"[GFData Bot v3.5] Initialized - Snowflake connected")
         
         # GF Data credentials - check environment first, then Snowflake
         self.gfdata_username = os.environ.get('GFDATA_USERNAME')
@@ -112,7 +119,7 @@ class GFDataBot:
             cursor.close()
     
     async def start_browser(self, headless: bool = True):
-        """Initialize Playwright browser."""
+        """Initialize Playwright browser with CDP session for network interception."""
         playwright = await async_playwright().start()
         self.browser = await playwright.chromium.launch(
             headless=headless,
@@ -125,7 +132,74 @@ class GFDataBot:
         self.page = await context.new_page()
         self.page.set_default_timeout(60000)
         
-        print("[GFData Bot] Browser initialized")
+        # Set up CDP session for network interception
+        self.cdp_session = await self.page.context.new_cdp_session(self.page)
+        
+        # Enable network domain and fetch domain for interception
+        await self.cdp_session.send('Network.enable')
+        await self.cdp_session.send('Fetch.enable', {
+            'patterns': [
+                {'urlPattern': '*', 'resourceType': 'Document'},
+                {'urlPattern': '*.xlsx', 'resourceType': 'Document'},
+                {'urlPattern': '*.xls', 'resourceType': 'Document'},
+                {'urlPattern': '*export*', 'resourceType': 'Document'},
+                {'urlPattern': '*download*', 'resourceType': 'Document'},
+            ]
+        })
+        
+        # Set up response handler to catch file downloads
+        self.cdp_session.on('Fetch.requestPaused', self._handle_request_paused)
+        
+        print("[GFData Bot v3.5] Browser initialized with CDP network interception")
+    
+    async def _handle_request_paused(self, event):
+        """Handle paused requests to intercept file downloads."""
+        request_id = event['requestId']
+        url = event['request']['url']
+        
+        # Check if this looks like a file download
+        is_download = any([
+            'export' in url.lower(),
+            'download' in url.lower(),
+            '.xlsx' in url.lower(),
+            '.xls' in url.lower(),
+            'excel' in url.lower(),
+        ])
+        
+        if is_download:
+            print(f"[GFData Bot v3.5] Intercepted potential download: {url}")
+            
+            try:
+                # Get the response body
+                response = await self.cdp_session.send('Fetch.getResponseBody', {
+                    'requestId': request_id
+                })
+                
+                if response.get('body'):
+                    body = response['body']
+                    is_base64 = response.get('base64Encoded', False)
+                    
+                    if is_base64:
+                        file_data = base64.b64decode(body)
+                    else:
+                        file_data = body.encode('utf-8')
+                    
+                    # Store the intercepted download
+                    self._intercepted_downloads[url] = file_data
+                    self._download_complete.set()
+                    print(f"[GFData Bot v3.5] Captured download: {len(file_data)} bytes")
+                    
+            except Exception as e:
+                print(f"[GFData Bot v3.5] Error capturing download body: {e}")
+        
+        # Continue the request
+        try:
+            await self.cdp_session.send('Fetch.continueRequest', {
+                'requestId': request_id
+            })
+        except Exception as e:
+            # Request may have already completed
+            pass
     
     async def login(self) -> bool:
         """Log into GF Data portal."""
@@ -450,8 +524,8 @@ class GFDataBot:
         print("[GFData Bot] Search filters configured")
     
     async def execute_search_and_download(self) -> Path:
-        """Execute the search and download results to Excel."""
-        print("[GFData Bot] Executing search...")
+        """Execute the search and download results to Excel using multiple capture methods."""
+        print("[GFData Bot v3.5] Executing search...")
         
         # Click search/apply/submit button
         search_selectors = [
@@ -481,22 +555,24 @@ class GFDataBot:
         
         await self.page.screenshot(path=str(self.download_dir / "06_search_results.png"))
         
-        # Download to Excel - Handle javascript:void(0) button
-        print("[GFData Bot] Downloading results...")
+        # Download to Excel - Handle javascript:void(0) button with multiple methods
+        print("[GFData Bot v3.5] Attempting download with CDP interception + fallback methods...")
         
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"gfdata_export_{timestamp}.xlsx"
         filepath = self.download_dir / filename
         
-        # Selectors for Export to Excel button (javascript:void(0) triggered)
+        # Clear any previous intercepted downloads
+        self._intercepted_downloads.clear()
+        self._download_complete.clear()
+        
+        # Selectors for Export to Excel button
         download_selectors = [
-            # EXACT match for GF Data UI - the button uses javascript:void(0)
             'a:has-text("Export to Excel")',
             'button:has-text("Export to Excel")',
             'a[href="javascript:void(0);"]:has-text("Export")',
             'a[href="javascript:void(0);"]:has-text("Excel")',
             ':text("Export to Excel")',
-            # Fallbacks
             'button:has-text("Excel")',
             'button:has-text("Download")',
             'button:has-text("Export")',
@@ -510,14 +586,14 @@ class GFDataBot:
             '#downloadBtn'
         ]
         
-        # Find and click the export button
+        # Find the export button
         export_button = None
         for selector in download_selectors:
             try:
                 locator = self.page.locator(selector)
                 if await locator.count() > 0:
                     export_button = locator.first
-                    print(f"[GFData Bot] Found export button: {selector}")
+                    print(f"[GFData Bot v3.5] Found export button: {selector}")
                     break
             except Exception:
                 continue
@@ -526,65 +602,176 @@ class GFDataBot:
             await self.page.screenshot(path=str(self.download_dir / "no_export_button.png"))
             raise Exception("Could not find Export to Excel button")
         
-        # Set up download handler BEFORE clicking
-        # For javascript:void(0) buttons, the download is triggered by JS onclick
+        download_success = False
+        
+        # METHOD 1: Try standard Playwright download first
         try:
-            # Method 1: Use expect_download with the click inside
-            async with self.page.expect_download(timeout=90000) as download_info:
+            print("[GFData Bot v3.5] Method 1: Standard Playwright download...")
+            async with self.page.expect_download(timeout=30000) as download_info:
                 await export_button.click(timeout=10000)
-                print("[GFData Bot] Clicked export button, waiting for download...")
             
             download = await download_info.value
             await download.save_as(str(filepath))
-            print(f"[GFData Bot] Downloaded: {filepath}")
+            print(f"[GFData Bot v3.5] Method 1 success: {filepath}")
+            download_success = True
             
-        except Exception as e:
-            print(f"[GFData Bot] Method 1 failed: {e}")
-            
-            # Method 2: Click first, then wait for download event
+        except Exception as e1:
+            print(f"[GFData Bot v3.5] Method 1 failed: {e1}")
+        
+        # METHOD 2: CDP network interception (already listening)
+        if not download_success:
             try:
-                print("[GFData Bot] Trying alternative download method...")
+                print("[GFData Bot v3.5] Method 2: CDP network interception...")
                 
-                # Set up a download listener
-                download_promise = asyncio.create_task(
-                    self.page.wait_for_event('download', timeout=90000)
-                )
-                
-                # Click the button
+                # Click the button and wait for CDP to intercept
                 await export_button.click(timeout=10000)
-                print("[GFData Bot] Clicked export, waiting for download event...")
                 
-                # Wait for download
-                download = await download_promise
-                await download.save_as(str(filepath))
-                print(f"[GFData Bot] Downloaded via method 2: {filepath}")
-                
-            except Exception as e2:
-                print(f"[GFData Bot] Method 2 failed: {e2}")
-                
-                # Method 3: Check if file was downloaded to default location
+                # Wait for intercepted download (max 60 seconds)
                 try:
-                    print("[GFData Bot] Trying method 3: Check for recent downloads...")
-                    await asyncio.sleep(10)  # Wait for potential download
+                    await asyncio.wait_for(self._download_complete.wait(), timeout=60)
                     
-                    # Look for recently created xlsx files
-                    import glob
-                    recent_files = glob.glob("/tmp/*.xlsx") + glob.glob("/tmp/gfdata_downloads/*.xlsx")
-                    if recent_files:
-                        most_recent = max(recent_files, key=os.path.getctime)
-                        if os.path.getctime(most_recent) > (datetime.now().timestamp() - 60):
-                            import shutil
-                            shutil.copy(most_recent, str(filepath))
-                            print(f"[GFData Bot] Found download at: {most_recent}")
-                        else:
-                            raise Exception("No recent download found")
-                    else:
-                        raise Exception("No xlsx files found")
+                    if self._intercepted_downloads:
+                        # Save the most recent intercepted download
+                        url, file_data = list(self._intercepted_downloads.items())[-1]
+                        with open(filepath, 'wb') as f:
+                            f.write(file_data)
+                        print(f"[GFData Bot v3.5] Method 2 success: {filepath} ({len(file_data)} bytes)")
+                        download_success = True
                         
-                except Exception as e3:
-                    print(f"[GFData Bot] Method 3 failed: {e3}")
-                    await self.page.screenshot(path=str(self.download_dir / "download_error.png"))
-                    raise Exception(f"All download methods failed. Last error: {e3}")
+                except asyncio.TimeoutError:
+                    print("[GFData Bot v3.5] Method 2 timeout - no download intercepted")
+                    
+            except Exception as e2:
+                print(f"[GFData Bot v3.5] Method 2 failed: {e2}")
+        
+        # METHOD 3: Evaluate JavaScript to trigger download directly
+        if not download_success:
+            try:
+                print("[GFData Bot v3.5] Method 3: JavaScript evaluation...")
+                
+                # Try to find and call the export function directly
+                js_triggers = [
+                    "document.querySelector('a[href*=\"void\"]').click()",
+                    "exportToExcel()",
+                    "downloadExcel()",
+                    "doExport()",
+                    "$('#exportExcel').click()",
+                    "$('.export-btn').click()",
+                ]
+                
+                for js in js_triggers:
+                    try:
+                        await self.page.evaluate(js)
+                        await asyncio.sleep(5)
+                        
+                        # Check if CDP captured anything
+                        if self._intercepted_downloads:
+                            url, file_data = list(self._intercepted_downloads.items())[-1]
+                            with open(filepath, 'wb') as f:
+                                f.write(file_data)
+                            print(f"[GFData Bot v3.5] Method 3 success via {js}")
+                            download_success = True
+                            break
+                    except:
+                        continue
+                        
+            except Exception as e3:
+                print(f"[GFData Bot v3.5] Method 3 failed: {e3}")
+        
+        # METHOD 4: Check for blob/data URL downloads
+        if not download_success:
+            try:
+                print("[GFData Bot v3.5] Method 4: Blob URL detection...")
+                
+                # Some sites create blob URLs for downloads
+                blob_url = await self.page.evaluate("""
+                    () => {
+                        // Check if there's a recent blob URL
+                        const links = document.querySelectorAll('a[href^="blob:"]');
+                        if (links.length > 0) {
+                            return links[links.length - 1].href;
+                        }
+                        return null;
+                    }
+                """)
+                
+                if blob_url:
+                    print(f"[GFData Bot v3.5] Found blob URL: {blob_url}")
+                    # Navigate to blob URL to trigger download
+                    async with self.page.expect_download(timeout=30000) as download_info:
+                        await self.page.goto(blob_url)
+                    download = await download_info.value
+                    await download.save_as(str(filepath))
+                    download_success = True
+                    
+            except Exception as e4:
+                print(f"[GFData Bot v3.5] Method 4 failed: {e4}")
+        
+        # METHOD 5: Table scraping fallback
+        if not download_success:
+            try:
+                print("[GFData Bot v3.5] Method 5: Direct table scraping...")
+                
+                # Scrape the data table directly from the DOM
+                table_data = await self.page.evaluate("""
+                    () => {
+                        const tables = document.querySelectorAll('table');
+                        for (const table of tables) {
+                            const rows = table.querySelectorAll('tr');
+                            if (rows.length > 5) {  // Assume data table has multiple rows
+                                const data = [];
+                                for (const row of rows) {
+                                    const cells = row.querySelectorAll('td, th');
+                                    const rowData = Array.from(cells).map(cell => cell.innerText.trim());
+                                    if (rowData.length > 0) {
+                                        data.push(rowData);
+                                    }
+                                }
+                                if (data.length > 1) {
+                                    return data;
+                                }
+                            }
+                        }
+                        return null;
+                    }
+                """)
+                
+                if table_data and len(table_data) > 1:
+                    print(f"[GFData Bot v3.5] Scraped {len(table_data)} rows from table")
+                    
+                    # Convert to DataFrame and save as Excel
+                    headers = table_data[0]
+                    data_rows = table_data[1:]
+                    df = pd.DataFrame(data_rows, columns=headers)
+                    df.to_excel(filepath, index=False)
+                    print(f"[GFData Bot v3.5] Method 5 success: {filepath}")
+                    download_success = True
+                    
+            except Exception as e5:
+                print(f"[GFData Bot v3.5] Method 5 failed: {e5}")
+        
+        # METHOD 6: Check /tmp for recent files
+        if not download_success:
+            try:
+                print("[GFData Bot v3.5] Method 6: Checking for recent downloads in /tmp...")
+                await asyncio.sleep(10)  # Wait for potential download
+                
+                import glob
+                recent_files = glob.glob("/tmp/*.xlsx") + glob.glob("/tmp/gfdata_downloads/*.xlsx")
+                if recent_files:
+                    most_recent = max(recent_files, key=os.path.getctime)
+                    if os.path.getctime(most_recent) > (datetime.now().timestamp() - 120):
+                        import shutil
+                        shutil.copy(most_recent, str(filepath))
+                        print(f"[GFData Bot v3.5] Method 6 success: found {most_recent}")
+                        download_success = True
+                        
+            except Exception as e6:
+                print(f"[GFData Bot v3.5] Method 6 failed: {e6}")
+        
+        if not download_success:
+            await self.page.screenshot(path=str(self.download_dir / "download_error.png"))
+            raise Exception("All 6 download methods failed")
         
         return filepath
     
@@ -598,7 +785,6 @@ class GFDataBot:
         df.columns = [str(col).strip().upper().replace(' ', '_').replace('/', '_').replace('-', '_') for col in df.columns]
         
         # CRITICAL FIX: Convert all columns to strings to avoid mixed type errors
-        # This handles the "ALL" column and any other columns with mixed types
         for col in df.columns:
             df[col] = df[col].astype(str)
             # Replace 'nan' strings with None for proper NULL handling
@@ -633,7 +819,6 @@ class GFDataBot:
         Load parsed data to Snowflake staging table.
         
         Uses DROP/CREATE to handle schema changes from Excel exports.
-        Raw data goes to GFDATA_RAW for later transformation to GFDATA_TRANSACTIONS.
         """
         print(f"[GFData Bot] Loading {len(df)} records to HURRICANE.MARKET_INTEL.{table_name}")
         
@@ -687,7 +872,7 @@ class GFDataBot:
                 (source_id, job_type, job_status, started_at, completed_at, 
                  reports_found, reports_new, scraper_version, execution_environment)
                 VALUES (%s, 'SCHEDULED', 'COMPLETED', CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP(),
-                        %s, %s, '3.4.0', 'PLAYWRIGHT_BOT')
+                        %s, %s, '3.5.0', 'PLAYWRIGHT_BOT')
             """, (source_id, records_loaded, records_loaded))
             self.snowflake_conn.commit()
         except:
@@ -730,7 +915,7 @@ class GFDataBot:
             await self.browser.close()
         if self.snowflake_conn:
             self.snowflake_conn.close()
-        print("[GFData Bot] Shutdown complete")
+        print("[GFData Bot v3.5] Shutdown complete")
 
 
 # Pre-configured query profiles for MGC focus areas
@@ -770,7 +955,7 @@ async def main():
     """Main entry point for scheduled execution."""
     import argparse
     
-    parser = argparse.ArgumentParser(description='GF Data Extraction Bot')
+    parser = argparse.ArgumentParser(description='GF Data Extraction Bot v3.5')
     parser.add_argument('--profile', choices=list(QUERY_PROFILES.keys()), 
                         default='full_lower_middle_market',
                         help='Query profile to use')
@@ -779,13 +964,13 @@ async def main():
     
     query_params = QUERY_PROFILES[args.profile].copy()
     
-    print(f"[GFData Bot] Starting extraction with profile: {args.profile}")
-    print(f"[GFData Bot] Query params: {query_params}")
+    print(f"[GFData Bot v3.5] Starting extraction with profile: {args.profile}")
+    print(f"[GFData Bot v3.5] Query params: {query_params}")
     
     bot = GFDataBot()
     records = await bot.run_full_extraction(query_params)
     
-    print(f"[GFData Bot] Extraction complete. {records} records loaded.")
+    print(f"[GFData Bot v3.5] Extraction complete. {records} records loaded.")
 
 
 if __name__ == '__main__':
