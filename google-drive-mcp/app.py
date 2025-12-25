@@ -1,12 +1,8 @@
 """
 Google Drive MCP Server - Streamable HTTP transport for Claude.ai
 """
-
-import os
-import json
-import io
-import uuid
-from flask import Flask, request, jsonify
+import os, json, io, uuid
+from flask import Flask, request, jsonify, make_response
 from flask_cors import CORS
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
@@ -17,311 +13,131 @@ from pptx import Presentation
 from docx import Document
 
 app = Flask(__name__)
-CORS(app, resources={r"/mcp": {"origins": "*", "methods": ["POST", "OPTIONS"], "allow_headers": ["Content-Type", "Mcp-Session-Id"]}})
+CORS(app, resources={r"/mcp": {"origins": "*", "methods": ["POST", "OPTIONS"], "allow_headers": ["Content-Type", "Mcp-Session-Id"], "expose_headers": ["Mcp-Session-Id"]}})
 sessions = {}
-
 SCOPES = ['https://www.googleapis.com/auth/drive.readonly']
 
 def get_drive_service():
     creds_json = os.environ.get('GOOGLE_SERVICE_ACCOUNT_JSON')
-    if not creds_json:
-        raise ValueError("GOOGLE_SERVICE_ACCOUNT_JSON environment variable not set")
-    creds_dict = json.loads(creds_json)
-    credentials = service_account.Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
-    return build('drive', 'v3', credentials=credentials)
+    if not creds_json: raise ValueError("GOOGLE_SERVICE_ACCOUNT_JSON not set")
+    return build('drive', 'v3', credentials=service_account.Credentials.from_service_account_info(json.loads(creds_json), scopes=SCOPES))
 
 TOOLS = [
-    {
-        "name": "list_folder_contents",
-        "description": "List all files and folders in a Google Drive folder. Returns file names, IDs, types, and sizes.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "folder_id": {"type": "string", "description": "The Google Drive folder ID. Use 'root' for the root folder."},
-                "page_size": {"type": "integer", "description": "Number of files to return (max 100)", "default": 50}
-            },
-            "required": ["folder_id"]
-        }
-    },
-    {
-        "name": "search_files",
-        "description": "Search for files in Google Drive by name or content.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "query": {"type": "string", "description": "Search query (file name or content)"},
-                "folder_id": {"type": "string", "description": "Optional folder ID to limit search scope"},
-                "file_type": {"type": "string", "description": "Filter by file type: spreadsheet, document, pdf, presentation, folder"}
-            },
-            "required": ["query"]
-        }
-    },
-    {
-        "name": "read_excel_file",
-        "description": "Read an Excel file (.xlsx, .xls) or Google Sheet and return its contents as JSON.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "file_id": {"type": "string", "description": "The Google Drive file ID"},
-                "sheet_name": {"type": "string", "description": "Specific sheet name to read (optional)"}
-            },
-            "required": ["file_id"]
-        }
-    },
-    {
-        "name": "read_pdf_file",
-        "description": "Read a PDF file and extract its text content.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "file_id": {"type": "string", "description": "The Google Drive file ID"},
-                "page_numbers": {"type": "array", "items": {"type": "integer"}, "description": "Specific pages to read"}
-            },
-            "required": ["file_id"]
-        }
-    },
-    {
-        "name": "read_powerpoint_file",
-        "description": "Read a PowerPoint file (.pptx) or Google Slides and extract text from all slides.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {"file_id": {"type": "string", "description": "The Google Drive file ID"}},
-            "required": ["file_id"]
-        }
-    },
-    {
-        "name": "read_word_file",
-        "description": "Read a Word document (.docx) or Google Doc and extract its text content.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {"file_id": {"type": "string", "description": "The Google Drive file ID"}},
-            "required": ["file_id"]
-        }
-    },
-    {
-        "name": "read_text_file",
-        "description": "Read a text-based file (txt, csv, json, etc.) and return its contents.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {"file_id": {"type": "string", "description": "The Google Drive file ID"}},
-            "required": ["file_id"]
-        }
-    },
-    {
-        "name": "get_file_metadata",
-        "description": "Get detailed metadata about a file including name, size, created date, modified date, owner.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {"file_id": {"type": "string", "description": "The Google Drive file ID"}},
-            "required": ["file_id"]
-        }
-    }
+    {"name": "list_folder_contents", "description": "List files in a folder", "inputSchema": {"type": "object", "properties": {"folder_id": {"type": "string"}, "page_size": {"type": "integer", "default": 50}}, "required": ["folder_id"]}},
+    {"name": "search_files", "description": "Search files by name", "inputSchema": {"type": "object", "properties": {"query": {"type": "string"}, "folder_id": {"type": "string"}, "file_type": {"type": "string"}}, "required": ["query"]}},
+    {"name": "read_excel_file", "description": "Read Excel/Sheets", "inputSchema": {"type": "object", "properties": {"file_id": {"type": "string"}, "sheet_name": {"type": "string"}}, "required": ["file_id"]}},
+    {"name": "read_pdf_file", "description": "Extract PDF text", "inputSchema": {"type": "object", "properties": {"file_id": {"type": "string"}, "page_numbers": {"type": "array", "items": {"type": "integer"}}}, "required": ["file_id"]}},
+    {"name": "read_powerpoint_file", "description": "Extract PowerPoint text", "inputSchema": {"type": "object", "properties": {"file_id": {"type": "string"}}, "required": ["file_id"]}},
+    {"name": "read_word_file", "description": "Extract Word text", "inputSchema": {"type": "object", "properties": {"file_id": {"type": "string"}}, "required": ["file_id"]}},
+    {"name": "read_text_file", "description": "Read text files", "inputSchema": {"type": "object", "properties": {"file_id": {"type": "string"}}, "required": ["file_id"]}},
+    {"name": "get_file_metadata", "description": "Get file metadata", "inputSchema": {"type": "object", "properties": {"file_id": {"type": "string"}}, "required": ["file_id"]}}
 ]
 
-def download_file(service, file_id):
-    request = service.files().get_media(fileId=file_id)
-    file_buffer = io.BytesIO()
-    downloader = MediaIoBaseDownload(file_buffer, request)
+def download_file(svc, fid):
+    buf = io.BytesIO()
+    dl = MediaIoBaseDownload(buf, svc.files().get_media(fileId=fid))
     done = False
-    while not done:
-        status, done = downloader.next_chunk()
-    file_buffer.seek(0)
-    return file_buffer
+    while not done: _, done = dl.next_chunk()
+    buf.seek(0)
+    return buf
 
-def export_google_file(service, file_id, mime_type):
-    request = service.files().export_media(fileId=file_id, mimeType=mime_type)
-    file_buffer = io.BytesIO()
-    downloader = MediaIoBaseDownload(file_buffer, request)
+def export_file(svc, fid, mime):
+    buf = io.BytesIO()
+    dl = MediaIoBaseDownload(buf, svc.files().export_media(fileId=fid, mimeType=mime))
     done = False
-    while not done:
-        status, done = downloader.next_chunk()
-    file_buffer.seek(0)
-    return file_buffer
+    while not done: _, done = dl.next_chunk()
+    buf.seek(0)
+    return buf
 
 def list_folder_contents(folder_id, page_size=50):
-    service = get_drive_service()
-    query = f"'{folder_id}' in parents and trashed = false"
-    results = service.files().list(
-        q=query, pageSize=min(page_size, 100),
-        fields="files(id, name, mimeType, size, createdTime, modifiedTime, owners)"
-    ).execute()
-    files = results.get('files', [])
-    formatted = [{"id": f.get('id'), "name": f.get('name'), "type": f.get('mimeType'),
-                  "size": f.get('size', 'N/A'), "modified": f.get('modifiedTime')} for f in files]
-    return {"files": formatted, "count": len(formatted)}
+    svc = get_drive_service()
+    files = svc.files().list(q=f"'{folder_id}' in parents and trashed=false", pageSize=min(page_size, 100), fields="files(id,name,mimeType,size,modifiedTime)").execute().get('files', [])
+    return {"files": [{"id": f['id'], "name": f['name'], "type": f['mimeType'], "size": f.get('size', 'N/A'), "modified": f.get('modifiedTime')} for f in files]}
 
 def search_files(query, folder_id=None, file_type=None):
-    service = get_drive_service()
-    search_query = f"name contains '{query}' and trashed = false"
-    if folder_id:
-        search_query += f" and '{folder_id}' in parents"
-    mime_map = {"spreadsheet": "application/vnd.google-apps.spreadsheet",
-                "document": "application/vnd.google-apps.document", "pdf": "application/pdf",
-                "presentation": "application/vnd.google-apps.presentation",
-                "folder": "application/vnd.google-apps.folder"}
-    if file_type and file_type in mime_map:
-        search_query += f" and mimeType = '{mime_map[file_type]}'"
-    results = service.files().list(q=search_query, pageSize=50,
-                                   fields="files(id, name, mimeType, size, modifiedTime)").execute()
-    return {"files": results.get('files', []), "query": search_query}
+    svc = get_drive_service()
+    q = f"name contains '{query}' and trashed=false"
+    if folder_id: q += f" and '{folder_id}' in parents"
+    mime_map = {"spreadsheet": "application/vnd.google-apps.spreadsheet", "document": "application/vnd.google-apps.document", "pdf": "application/pdf", "presentation": "application/vnd.google-apps.presentation", "folder": "application/vnd.google-apps.folder"}
+    if file_type in mime_map: q += f" and mimeType='{mime_map[file_type]}'"
+    return {"files": svc.files().list(q=q, pageSize=50, fields="files(id,name,mimeType,size)").execute().get('files', [])}
 
 def read_excel_file(file_id, sheet_name=None):
-    service = get_drive_service()
-    file_meta = service.files().get(fileId=file_id, fields="mimeType,name").execute()
-    mime_type = file_meta.get('mimeType')
-    if mime_type == 'application/vnd.google-apps.spreadsheet':
-        file_buffer = export_google_file(service, file_id, 
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-    else:
-        file_buffer = download_file(service, file_id)
+    svc = get_drive_service()
+    meta = svc.files().get(fileId=file_id, fields="mimeType,name").execute()
+    buf = export_file(svc, file_id, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') if 'spreadsheet' in meta.get('mimeType', '') else download_file(svc, file_id)
     if sheet_name:
-        df = pd.read_excel(file_buffer, sheet_name=sheet_name)
-        return {"file_name": file_meta.get('name'), "sheet": sheet_name,
-                "columns": list(df.columns), "row_count": len(df), "data": df.head(100).to_dict(orient='records')}
-    else:
-        xlsx = pd.ExcelFile(file_buffer)
-        sheets_data = {}
-        for sheet in xlsx.sheet_names[:5]:
-            df = pd.read_excel(xlsx, sheet_name=sheet)
-            sheets_data[sheet] = {"columns": list(df.columns), "row_count": len(df),
-                                  "data": df.head(50).to_dict(orient='records')}
-        return {"file_name": file_meta.get('name'), "sheets": list(xlsx.sheet_names), "data": sheets_data}
+        df = pd.read_excel(buf, sheet_name=sheet_name)
+        return {"file_name": meta['name'], "sheet": sheet_name, "columns": list(df.columns), "row_count": len(df), "data": df.head(100).to_dict(orient='records')}
+    xlsx = pd.ExcelFile(buf)
+    return {"file_name": meta['name'], "sheets": xlsx.sheet_names, "data": {s: {"columns": list((df := pd.read_excel(xlsx, sheet_name=s)).columns), "rows": len(df), "data": df.head(50).to_dict(orient='records')} for s in xlsx.sheet_names[:5]}}
 
 def read_pdf_file(file_id, page_numbers=None):
-    service = get_drive_service()
-    file_meta = service.files().get(fileId=file_id, fields="name").execute()
-    file_buffer = download_file(service, file_id)
-    reader = PdfReader(file_buffer)
-    total_pages = len(reader.pages)
-    pages_to_read = page_numbers if page_numbers else range(min(total_pages, 20))
-    text_content = []
-    for page_num in pages_to_read:
-        if 0 <= page_num < total_pages:
-            text_content.append({"page": page_num + 1, "text": reader.pages[page_num].extract_text()})
-    return {"file_name": file_meta.get('name'), "total_pages": total_pages, "content": text_content}
+    svc = get_drive_service()
+    meta = svc.files().get(fileId=file_id, fields="name").execute()
+    reader = PdfReader(download_file(svc, file_id))
+    pages = page_numbers or range(min(len(reader.pages), 20))
+    return {"file_name": meta['name'], "total_pages": len(reader.pages), "content": [{"page": p+1, "text": reader.pages[p].extract_text()} for p in pages if 0 <= p < len(reader.pages)]}
 
 def read_powerpoint_file(file_id):
-    service = get_drive_service()
-    file_meta = service.files().get(fileId=file_id, fields="mimeType,name").execute()
-    if file_meta.get('mimeType') == 'application/vnd.google-apps.presentation':
-        file_buffer = export_google_file(service, file_id,
-            'application/vnd.openxmlformats-officedocument.presentationml.presentation')
-    else:
-        file_buffer = download_file(service, file_id)
-    prs = Presentation(file_buffer)
-    slides = []
-    for idx, slide in enumerate(prs.slides):
-        text = "\n".join([shape.text for shape in slide.shapes if hasattr(shape, "text")])
-        slides.append({"slide_number": idx + 1, "text": text})
-    return {"file_name": file_meta.get('name'), "total_slides": len(prs.slides), "slides": slides}
+    svc = get_drive_service()
+    meta = svc.files().get(fileId=file_id, fields="mimeType,name").execute()
+    buf = export_file(svc, file_id, 'application/vnd.openxmlformats-officedocument.presentationml.presentation') if 'presentation' in meta.get('mimeType', '') else download_file(svc, file_id)
+    prs = Presentation(buf)
+    return {"file_name": meta['name'], "slides": [{"num": i+1, "text": "\n".join([s.text for s in sl.shapes if hasattr(s, "text")])} for i, sl in enumerate(prs.slides)]}
 
 def read_word_file(file_id):
-    service = get_drive_service()
-    file_meta = service.files().get(fileId=file_id, fields="mimeType,name").execute()
-    if file_meta.get('mimeType') == 'application/vnd.google-apps.document':
-        file_buffer = export_google_file(service, file_id,
-            'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
-    else:
-        file_buffer = download_file(service, file_id)
-    doc = Document(file_buffer)
-    paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
-    return {"file_name": file_meta.get('name'), "paragraph_count": len(paragraphs), "paragraphs": paragraphs[:100]}
+    svc = get_drive_service()
+    meta = svc.files().get(fileId=file_id, fields="mimeType,name").execute()
+    buf = export_file(svc, file_id, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') if 'document' in meta.get('mimeType', '') else download_file(svc, file_id)
+    return {"file_name": meta['name'], "paragraphs": [p.text for p in Document(buf).paragraphs if p.text.strip()][:100]}
 
 def read_text_file(file_id):
-    service = get_drive_service()
-    file_meta = service.files().get(fileId=file_id, fields="name,mimeType").execute()
-    file_buffer = download_file(service, file_id)
-    content = file_buffer.read().decode('utf-8', errors='replace')
-    return {"file_name": file_meta.get('name'), "content": content[:50000]}
+    svc = get_drive_service()
+    meta = svc.files().get(fileId=file_id, fields="name").execute()
+    return {"file_name": meta['name'], "content": download_file(svc, file_id).read().decode('utf-8', errors='replace')[:50000]}
 
 def get_file_metadata(file_id):
-    service = get_drive_service()
-    f = service.files().get(fileId=file_id,
-        fields="id,name,mimeType,size,createdTime,modifiedTime,owners,webViewLink").execute()
-    return {"id": f.get('id'), "name": f.get('name'), "mime_type": f.get('mimeType'),
-            "size": f.get('size'), "created": f.get('createdTime'), "modified": f.get('modifiedTime'),
-            "owner": f.get('owners', [{}])[0].get('emailAddress'), "web_link": f.get('webViewLink')}
+    svc = get_drive_service()
+    f = svc.files().get(fileId=file_id, fields="id,name,mimeType,size,createdTime,modifiedTime,owners,webViewLink").execute()
+    return {"id": f['id'], "name": f['name'], "type": f['mimeType'], "size": f.get('size'), "created": f.get('createdTime'), "modified": f.get('modifiedTime'), "owner": f.get('owners', [{}])[0].get('emailAddress'), "link": f.get('webViewLink')}
 
 def execute_tool(name, args):
-    if name == 'list_folder_contents':
-        return list_folder_contents(args.get('folder_id'), args.get('page_size', 50))
-    elif name == 'search_files':
-        return search_files(args.get('query'), args.get('folder_id'), args.get('file_type'))
-    elif name == 'read_excel_file':
-        return read_excel_file(args.get('file_id'), args.get('sheet_name'))
-    elif name == 'read_pdf_file':
-        return read_pdf_file(args.get('file_id'), args.get('page_numbers'))
-    elif name == 'read_powerpoint_file':
-        return read_powerpoint_file(args.get('file_id'))
-    elif name == 'read_word_file':
-        return read_word_file(args.get('file_id'))
-    elif name == 'read_text_file':
-        return read_text_file(args.get('file_id'))
-    elif name == 'get_file_metadata':
-        return get_file_metadata(args.get('file_id'))
-    else:
-        raise ValueError(f"Unknown tool: {name}")
+    dispatch = {"list_folder_contents": lambda: list_folder_contents(args.get('folder_id'), args.get('page_size', 50)), "search_files": lambda: search_files(args.get('query'), args.get('folder_id'), args.get('file_type')), "read_excel_file": lambda: read_excel_file(args.get('file_id'), args.get('sheet_name')), "read_pdf_file": lambda: read_pdf_file(args.get('file_id'), args.get('page_numbers')), "read_powerpoint_file": lambda: read_powerpoint_file(args.get('file_id')), "read_word_file": lambda: read_word_file(args.get('file_id')), "read_text_file": lambda: read_text_file(args.get('file_id')), "get_file_metadata": lambda: get_file_metadata(args.get('file_id'))}
+    if name not in dispatch: raise ValueError(f"Unknown tool: {name}")
+    return dispatch[name]()
 
 @app.route('/mcp', methods=['POST', 'OPTIONS'])
-def mcp_handler():
+def mcp():
     if request.method == 'OPTIONS':
-        return '', 204
-    
+        r = make_response('', 204)
+        r.headers['Access-Control-Allow-Origin'] = '*'
+        r.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
+        r.headers['Access-Control-Allow-Headers'] = 'Content-Type, Mcp-Session-Id'
+        r.headers['Access-Control-Expose-Headers'] = 'Mcp-Session-Id'
+        return r
+    try: data = request.get_json()
+    except: return jsonify({"jsonrpc": "2.0", "error": {"code": -32700, "message": "Parse error"}, "id": None})
+    if not data: return jsonify({"jsonrpc": "2.0", "error": {"code": -32700, "message": "Parse error"}, "id": None})
+    method, params, rid = data.get('method'), data.get('params', {}), data.get('id')
+    sid = request.headers.get('Mcp-Session-Id')
+    if not sid and method == "initialize": sid = str(uuid.uuid4()); sessions[sid] = True
     try:
-        data = request.get_json()
-    except:
-        return jsonify({"jsonrpc": "2.0", "error": {"code": -32700, "message": "Parse error"}, "id": None})
-    
-    if not data:
-        return jsonify({"jsonrpc": "2.0", "error": {"code": -32700, "message": "Parse error"}, "id": None})
-    
-    method = data.get('method')
-    params = data.get('params', {})
-    req_id = data.get('id')
-    session_id = request.headers.get('Mcp-Session-Id')
-    
-    resp_headers = {"Content-Type": "application/json"}
-    
-    if not session_id and method == "initialize":
-        session_id = str(uuid.uuid4())
-        sessions[session_id] = True
-        resp_headers["Mcp-Session-Id"] = session_id
-    
-    try:
-        if method == 'initialize':
-            result = {
-                "protocolVersion": "2024-11-05",
-                "serverInfo": {"name": "google-drive-mcp", "version": "2.1.0"},
-                "capabilities": {"tools": {}}
-            }
-        elif method == 'notifications/initialized':
-            return "", 204
-        elif method == 'tools/list':
-            result = {"tools": TOOLS}
-        elif method == 'tools/call':
-            tool_name = params.get('name')
-            tool_args = params.get('arguments', {})
-            tool_result = execute_tool(tool_name, tool_args)
-            result = {"content": [{"type": "text", "text": json.dumps(tool_result, indent=2, default=str)}]}
-        else:
-            return jsonify({"jsonrpc": "2.0", "error": {"code": -32601, "message": f"Method not found: {method}"}, "id": req_id}), 200, resp_headers
-        
-        return jsonify({"jsonrpc": "2.0", "result": result, "id": req_id}), 200, resp_headers
-    
-    except Exception as e:
-        return jsonify({"jsonrpc": "2.0", "error": {"code": -32000, "message": str(e)}, "id": req_id}), 200, resp_headers
+        if method == 'initialize': result = {"protocolVersion": "2024-11-05", "serverInfo": {"name": "google-drive-mcp", "version": "2.3.0"}, "capabilities": {"tools": {}}}
+        elif method == 'notifications/initialized': return '', 204
+        elif method == 'tools/list': result = {"tools": TOOLS}
+        elif method == 'tools/call': result = {"content": [{"type": "text", "text": json.dumps(execute_tool(params.get('name'), params.get('arguments', {})), indent=2, default=str)}]}
+        else: return jsonify({"jsonrpc": "2.0", "error": {"code": -32601, "message": f"Unknown: {method}"}, "id": rid})
+        r = make_response(jsonify({"jsonrpc": "2.0", "result": result, "id": rid}))
+        r.headers['Access-Control-Expose-Headers'] = 'Mcp-Session-Id'
+        if sid: r.headers['Mcp-Session-Id'] = sid
+        return r
+    except Exception as e: return jsonify({"jsonrpc": "2.0", "error": {"code": -32000, "message": str(e)}, "id": rid})
 
-@app.route('/health', methods=['GET'])
-def health():
-    return jsonify({"status": "healthy", "service": "google-drive-mcp"})
+@app.route('/health')
+def health(): return jsonify({"status": "healthy"})
 
-@app.route('/', methods=['GET'])
-def root():
-    return jsonify({"service": "Google Drive MCP", "version": "2.1.0", "transport": "streamable-http", "endpoint": "/mcp"})
+@app.route('/')
+def root(): return jsonify({"service": "Google Drive MCP", "version": "2.3.0", "endpoint": "/mcp"})
 
-print("Google Drive MCP Server (Streamable HTTP with CORS) starting...", flush=True)
-
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 8080))
-    print(f"Starting server on port {port}", flush=True)
-    app.run(host='0.0.0.0', port=port, debug=False)
+if __name__ == '__main__': app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
