@@ -1,1 +1,327 @@
-IiIiCkdvb2dsZSBEcml2ZSBNQ1AgU2VydmVyIC0gU3RyZWFtYWJsZSBIVFRQIHRyYW5zcG9ydCBmb3IgQ2xhdWRlLmFpCiIiIgoKaW1wb3J0IG9zCmltcG9ydCBqc29uCmltcG9ydCBpbwppbXBvcnQgdXVpZApmcm9tIGZsYXNrIGltcG9ydCBGbGFzaywgcmVxdWVzdCwganNvbmlmeQpmcm9tIGdvb2dsZS5vYXV0aDIgaW1wb3J0IHNlcnZpY2VfYWNjb3VudApmcm9tIGdvb2dsZWFwaWNsaWVudC5kaXNjb3ZlcnkgaW1wb3J0IGJ1aWxkCmZyb20gZ29vZ2xlYXBpY2xpZW50Lmh0dHAgaW1wb3J0IE1lZGlhSW9CYXNlRG93bmxvYWQKaW1wb3J0IHBhbmRhcyBhcyBwZApmcm9tIFB5UERGMiBpbXBvcnQgUGRmUmVhZGVyCmZyb20gcHB0eCBpbXBvcnQgUHJlc2VudGF0aW9uCmZyb20gZG9jeCBpbXBvcnQgRG9jdW1lbnQKCmFwcCA9IEZsYXNrKF9fbmFtZV9fKQpzZXNzaW9ucyA9IHt9CgpTQ09QRVMgPSBbJ2h0dHBzOi8vd3d3Lmdvb2dsZWFwaXMuY29tL2F1dGgvZHJpdmUucmVhZG9ubHknXQoKZGVmIGdldF9kcml2ZV9zZXJ2aWNlKCk6CiAgICBjcmVkc19qc29uID0gb3MuZW52aXJvbi5nZXQoJ0dPT0dMRV9TRVJWSUNFX0FDQ09VTlRfSlNPTicpCiAgICBpZiBub3QgY3JlZHNfanNvbjoKICAgICAgICByYWlzZSBWYWx1ZUVycm9yKCJHT09HTEVfU0VSVklDRV9BQ0NPVU5UX0pTT04gZW52aXJvbm1lbnQgdmFyaWFibGUgbm90IHNldCIpCiAgICBjcmVkc19kaWN0ID0ganNvbi5sb2FkcyhjcmVkc19qc29uKQogICAgY3JlZGVudGlhbHMgPSBzZXJ2aWNlX2FjY291bnQuQ3JlZGVudGlhbHMuZnJvbV9zZXJ2aWNlX2FjY291bnRfaW5mbyhjcmVkc19kaWN0LCBzY29wZXM9U0NPUEVTKQogICAgcmV0dXJuIGJ1aWxkKCdkcml2ZScsICd2MycsIGNyZWRlbnRpYWxzPWNyZWRlbnRpYWxzKQoKVE9PTFMgPSBbCiAgICB7CiAgICAgICAgIm5hbWUiOiAibGlzdF9mb2xkZXJfY29udGVudHMiLAogICAgICAgICJkZXNjcmlwdGlvbiI6ICJMaXN0IGFsbCBmaWxlcyBhbmQgZm9sZGVycyBpbiBhIEdvb2dsZSBEcml2ZSBmb2xkZXIuIFJldHVybnMgZmlsZSBuYW1lcywgSURzLCB0eXBlcywgYW5kIHNpemVzLiIsCiAgICAgICAgImlucHV0U2NoZW1hIjogewogICAgICAgICAgICAidHlwZSI6ICJvYmplY3QiLAogICAgICAgICAgICAicHJvcGVydGllcyI6IHsKICAgICAgICAgICAgICAgICJmb2xkZXJfaWQiOiB7InR5cGUiOiAic3RyaW5nIiwgImRlc2NyaXB0aW9uIjogIlRoZSBHb29nbGUgRHJpdmUgZm9sZGVyIElELiBVc2UgJ3Jvb3QnIGZvciB0aGUgcm9vdCBmb2xkZXIuIn0sCiAgICAgICAgICAgICAgICAicGFnZV9zaXplIjogeyJ0eXBlIjogImludGVnZXIiLCAiZGVzY3JpcHRpb24iOiAiTnVtYmVyIG9mIGZpbGVzIHRvIHJldHVybiAobWF4IDEwMCkiLCAiZGVmYXVsdCI6IDUwfQogICAgICAgICAgICB9LAogICAgICAgICAgICAicmVxdWlyZWQiOiBbImZvbGRlcl9pZCJdCiAgICAgICAgfQogICAgfSwKICAgIHsKICAgICAgICAibmFtZSI6ICJzZWFyY2hfZmlsZXMiLAogICAgICAgICJkZXNjcmlwdGlvbiI6ICJTZWFyY2ggZm9yIGZpbGVzIGluIEdvb2dsZSBEcml2ZSBieSBuYW1lIG9yIGNvbnRlbnQuIiwKICAgICAgICAiaW5wdXRTY2hlbWEiOiB7CiAgICAgICAgICAgICJ0eXBlIjogIm9iamVjdCIsCiAgICAgICAgICAgICJwcm9wZXJ0aWVzIjogewogICAgICAgICAgICAgICAgInF1ZXJ5IjogeyJ0eXBlIjogInN0cmluZyIsICJkZXNjcmlwdGlvbiI6ICJTZWFyY2ggcXVlcnkgKGZpbGUgbmFtZSBvciBjb250ZW50KSJ9LAogICAgICAgICAgICAgICAgImZvbGRlcl9pZCI6IHsidHlwZSI6ICJzdHJpbmciLCAiZGVzY3JpcHRpb24iOiAiT3B0aW9uYWwgZm9sZGVyIElEIHRvIGxpbWl0IHNlYXJjaCBzY29wZSJ9LAogICAgICAgICAgICAgICAgImZpbGVfdHlwZSI6IHsidHlwZSI6ICJzdHJpbmciLCAiZGVzY3JpcHRpb24iOiAiRmlsdGVyIGJ5IGZpbGUgdHlwZTogc3ByZWFkc2hlZXQsIGRvY3VtZW50LCBwZGYsIHByZXNlbnRhdGlvbiwgZm9sZGVyIn0KICAgICAgICAgICAgfSwKICAgICAgICAgICAgInJlcXVpcmVkIjogWyJxdWVyeSJdCiAgICAgICAgfQogICAgfSwKICAgIHsKICAgICAgICAibmFtZSI6ICJyZWFkX2V4Y2VsX2ZpbGUiLAogICAgICAgICJkZXNjcmlwdGlvbiI6ICJSZWFkIGFuIEV4Y2VsIGZpbGUgKC54bHN4LCAueGxzKSBvciBHb29nbGUgU2hlZXQgYW5kIHJldHVybiBpdHMgY29udGVudHMgYXMgSlNPTi4iLAogICAgICAgICJpbnB1dFNjaGVtYSI6IHsKICAgICAgICAgICAgInR5cGUiOiAib2JqZWN0IiwKICAgICAgICAgICAgInByb3BlcnRpZXMiOiB7CiAgICAgICAgICAgICAgICAiZmlsZV9pZCI6IHsidHlwZSI6ICJzdHJpbmciLCAiZGVzY3JpcHRpb24iOiAiVGhlIEdvb2dsZSBEcml2ZSBmaWxlIElEIn0sCiAgICAgICAgICAgICAgICAic2hlZXRfbmFtZSI6IHsidHlwZSI6ICJzdHJpbmciLCAiZGVzY3JpcHRpb24iOiAiU3BlY2lmaWMgc2hlZXQgbmFtZSB0byByZWFkIChvcHRpb25hbCkifQogICAgICAgICAgICB9LAogICAgICAgICAgICAicmVxdWlyZWQiOiBbImZpbGVfaWQiXQogICAgICAgIH0KICAgIH0sCiAgICB7CiAgICAgICAgIm5hbWUiOiAicmVhZF9wZGZfZmlsZSIsCiAgICAgICAgImRlc2NyaXB0aW9uIjogIlJlYWQgYSBQREYgZmlsZSBhbmQgZXh0cmFjdCBpdHMgdGV4dCBjb250ZW50LiIsCiAgICAgICAgImlucHV0U2NoZW1hIjogewogICAgICAgICAgICAidHlwZSI6ICJvYmplY3QiLAogICAgICAgICAgICAicHJvcGVydGllcyI6IHsKICAgICAgICAgICAgICAgICJmaWxlX2lkIjogeyJ0eXBlIjogInN0cmluZyIsICJkZXNjcmlwdGlvbiI6ICJUaGUgR29vZ2xlIERyaXZlIGZpbGUgSUQifSwKICAgICAgICAgICAgICAgICJwYWdlX251bWJlcnMiOiB7InR5cGUiOiAiYXJyYXkiLCAiaXRlbXMiOiB7InR5cGUiOiAiaW50ZWdlciJ9LCAiZGVzY3JpcHRpb24iOiAiU3BlY2lmaWMgcGFnZXMgdG8gcmVhZCJ9CiAgICAgICAgICAgIH0sCiAgICAgICAgICAgICJyZXF1aXJlZCI6IFsiZmlsZV9pZCJdCiAgICAgICAgfQogICAgfSwKICAgIHsKICAgICAgICAibmFtZSI6ICJyZWFkX3Bvd2VycG9pbnRfZmlsZSIsCiAgICAgICAgImRlc2NyaXB0aW9uIjogIlJlYWQgYSBQb3dlclBvaW50IGZpbGUgKC5wcHR4KSBvciBHb29nbGUgU2xpZGVzIGFuZCBleHRyYWN0IHRleHQgZnJvbSBhbGwgc2xpZGVzLiIsCiAgICAgICAgImlucHV0U2NoZW1hIjogewogICAgICAgICAgICAidHlwZSI6ICJvYmplY3QiLAogICAgICAgICAgICAicHJvcGVydGllcyI6IHsiZmlsZV9pZCI6IHsidHlwZSI6ICJzdHJpbmciLCAiZGVzY3JpcHRpb24iOiAiVGhlIEdvb2dsZSBEcml2ZSBmaWxlIElEIn19LAogICAgICAgICAgICAicmVxdWlyZWQiOiBbImZpbGVfaWQiXQogICAgICAgIH0KICAgIH0sCiAgICB7CiAgICAgICAgIm5hbWUiOiAicmVhZF93b3JkX2ZpbGUiLAogICAgICAgICJkZXNjcmlwdGlvbiI6ICJSZWFkIGEgV29yZCBkb2N1bWVudCAoLmRvY3gpIG9yIEdvb2dsZSBEb2MgYW5kIGV4dHJhY3QgaXRzIHRleHQgY29udGVudC4iLAogICAgICAgICJpbnB1dFNjaGVtYSI6IHsKICAgICAgICAgICAgInR5cGUiOiAib2JqZWN0IiwKICAgICAgICAgICAgInByb3BlcnRpZXMiOiB7ImZpbGVfaWQiOiB7InR5cGUiOiAic3RyaW5nIiwgImRlc2NyaXB0aW9uIjogIlRoZSBHb29nbGUgRHJpdmUgZmlsZSBJRCJ9fSwKICAgICAgICAgICAgInJlcXVpcmVkIjogWyJmaWxlX2lkIl0KICAgICAgICB9CiAgICB9LAogICAgewogICAgICAgICJuYW1lIjogInJlYWRfdGV4dF9maWxlIiwKICAgICAgICAiZGVzY3JpcHRpb24iOiAiUmVhZCBhIHRleHQtYmFzZWQgZmlsZSAodHh0LCBjc3YsIGpzb24sIGV0Yy4pIGFuZCByZXR1cm4gaXRzIGNvbnRlbnRzLiIsCiAgICAgICAgImlucHV0U2NoZW1hIjogewogICAgICAgICAgICAidHlwZSI6ICJvYmplY3QiLAogICAgICAgICAgICAicHJvcGVydGllcyI6IHsiZmlsZV9pZCI6IHsidHlwZSI6ICJzdHJpbmciLCAiZGVzY3JpcHRpb24iOiAiVGhlIEdvb2dsZSBEcml2ZSBmaWxlIElEIn19LAogICAgICAgICAgICAicmVxdWlyZWQiOiBbImZpbGVfaWQiXQogICAgICAgIH0KICAgIH0sCiAgICB7CiAgICAgICAgIm5hbWUiOiAiZ2V0X2ZpbGVfbWV0YWRhdGEiLAogICAgICAgICJkZXNjcmlwdGlvbiI6ICJHZXQgZGV0YWlsZWQgbWV0YWRhdGEgYWJvdXQgYSBmaWxlIGluY2x1ZGluZyBuYW1lLCBzaXplLCBjcmVhdGVkIGRhdGUsIG1vZGlmaWVkIGRhdGUsIG93bmVyLiIsCiAgICAgICAgImlucHV0U2NoZW1hIjogewogICAgICAgICAgICAidHlwZSI6ICJvYmplY3QiLAogICAgICAgICAgICAicHJvcGVydGllcyI6IHsiZmlsZV9pZCI6IHsidHlwZSI6ICJzdHJpbmciLCAiZGVzY3JpcHRpb24iOiAiVGhlIEdvb2dsZSBEcml2ZSBmaWxlIElEIn19LAogICAgICAgICAgICAicmVxdWlyZWQiOiBbImZpbGVfaWQiXQogICAgICAgIH0KICAgIH0KXQoKZGVmIGRvd25sb2FkX2ZpbGUoc2VydmljZSwgZmlsZV9pZCk6CiAgICByZXF1ZXN0ID0gc2VydmljZS5maWxlcygpLmdldF9tZWRpYShmaWxlSWQ9ZmlsZV9pZCkKICAgIGZpbGVfYnVmZmVyID0gaW8uQnl0ZXNJTygpCiAgICBkb3dubG9hZGVyID0gTWVkaWFJb0Jhc2VEb3dubG9hZChmaWxlX2J1ZmZlciwgcmVxdWVzdCkKICAgIGRvbmUgPSBGYWxzZQogICAgd2hpbGUgbm90IGRvbmU6CiAgICAgICAgc3RhdHVzLCBkb25lID0gZG93bmxvYWRlci5uZXh0X2NodW5rKCkKICAgIGZpbGVfYnVmZmVyLnNlZWsoMCkKICAgIHJldHVybiBmaWxlX2J1ZmZlcgoKZGVmIGV4cG9ydF9nb29nbGVfZmlsZShzZXJ2aWNlLCBmaWxlX2lkLCBtaW1lX3R5cGUpOgogICAgcmVxdWVzdCA9IHNlcnZpY2UuZmlsZXMoKS5leHBvcnRfbWVkaWEoZmlsZUlkPWZpbGVfaWQsIG1pbWVUeXBlPW1pbWVfdHlwZSkKICAgIGZpbGVfYnVmZmVyID0gaW8uQnl0ZXNJTygpCiAgICBkb3dubG9hZGVyID0gTWVkaWFJb0Jhc2VEb3dubG9hZChmaWxlX2J1ZmZlciwgcmVxdWVzdCkKICAgIGRvbmUgPSBGYWxzZQogICAgd2hpbGUgbm90IGRvbmU6CiAgICAgICAgc3RhdHVzLCBkb25lID0gZG93bmxvYWRlci5uZXh0X2NodW5rKCkKICAgIGZpbGVfYnVmZmVyLnNlZWsoMCkKICAgIHJldHVybiBmaWxlX2J1ZmZlcgoKZGVmIGxpc3RfZm9sZGVyX2NvbnRlbnRzKGZvbGRlcl9pZCwgcGFnZV9zaXplPTUwKToKICAgIHNlcnZpY2UgPSBnZXRfZHJpdmVfc2VydmljZSgpCiAgICBxdWVyeSA9IGYiJ3tmb2xkZXJfaWR9JyBpbiBwYXJlbnRzIGFuZCB0cmFzaGVkID0gZmFsc2UiCiAgICByZXN1bHRzID0gc2VydmljZS5maWxlcygpLmxpc3QoCiAgICAgICAgcT1xdWVyeSwgcGFnZVNpemU9bWluKHBhZ2Vfc2l6ZSwgMTAwKSwKICAgICAgICBmaWVsZHM9ImZpbGVzKGlkLCBuYW1lLCBtaW1lVHlwZSwgc2l6ZSwgY3JlYXRlZFRpbWUsIG1vZGlmaWVkVGltZSwgb3duZXJzKSIKICAgICkuZXhlY3V0ZSgpCiAgICBmaWxlcyA9IHJlc3VsdHMuZ2V0KCdmaWxlcycsIFtdKQogICAgZm9ybWF0dGVkID0gW3siaWQiOiBmLmdldCgnaWQnKSwgIm5hbWUiOiBmLmdldCgnbmFtZScpLCAidHlwZSI6IGYuZ2V0KCdtaW1lVHlwZScpLAogICAgICAgICAgICAgICAgICAic2l6ZSI6IGYuZ2V0KCdzaXplJywgJ04vQScpLCAibW9kaWZpZWQiOiBmLmdldCgnbW9kaWZpZWRUaW1lJyl9IGZvciBmIGluIGZpbGVzXQogICAgcmV0dXJuIHsiZmlsZXMiOiBmb3JtYXR0ZWQsICJjb3VudCI6IGxlbihmb3JtYXR0ZWQpfQoKZGVmIHNlYXJjaF9maWxlcyhxdWVyeSwgZm9sZGVyX2lkPU5vbmUsIGZpbGVfdHlwZT1Ob25lKToKICAgIHNlcnZpY2UgPSBnZXRfZHJpdmVfc2VydmljZSgpCiAgICBzZWFyY2hfcXVlcnkgPSBmIm5hbWUgY29udGFpbnMgJ3txdWVyeX0nIGFuZCB0cmFzaGVkID0gZmFsc2UiCiAgICBpZiBmb2xkZXJfaWQ6CiAgICAgICAgc2VhcmNoX3F1ZXJ5ICs9IGYiIGFuZCAne2ZvbGRlcl9pZH0nIGluIHBhcmVudHMiCiAgICBtaW1lX21hcCA9IHsic3ByZWFkc2hlZXQiOiAiYXBwbGljYXRpb24vdm5kLmdvb2dsZS1hcHBzLnNwcmVhZHNoZWV0IiwKICAgICAgICAgICAgICAgICJkb2N1bWVudCI6ICJhcHBsaWNhdGlvbi92bmQuZ29vZ2xlLWFwcHMuZG9jdW1lbnQiLCAicGRmIjogImFwcGxpY2F0aW9uL3BkZiIsCiAgICAgICAgICAgICAgICAicHJlc2VudGF0aW9uIjogImFwcGxpY2F0aW9uL3ZuZC5nb29nbGUtYXBwcy5wcmVzZW50YXRpb24iLAogICAgICAgICAgICAgICAgImZvbGRlciI6ICJhcHBsaWNhdGlvbi92bmQuZ29vZ2xlLWFwcHMuZm9sZGVyIn0KICAgIGlmIGZpbGVfdHlwZSBhbmQgZmlsZV90eXBlIGluIG1pbWVfbWFwOgogICAgICAgIHNlYXJjaF9xdWVyeSArPSBmIiBhbmQgbWltZVR5cGUgPSAne21pbWVfbWFwW2ZpbGVfdHlwZV19JyIKICAgIHJlc3VsdHMgPSBzZXJ2aWNlLmZpbGVzKCkubGlzdChxPXNlYXJjaF9xdWVyeSwgcGFnZVNpemU9NTAsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgZmllbGRzPSJmaWxlcyhpZCwgbmFtZSwgbWltZVR5cGUsIHNpemUsIG1vZGlmaWVkVGltZSkiKS5leGVjdXRlKCkKICAgIHJldHVybiB7ImZpbGVzIjogcmVzdWx0cy5nZXQoJ2ZpbGVzJywgW10pLCAicXVlcnkiOiBzZWFyY2hfcXVlcnl9CgpkZWYgcmVhZF9leGNlbF9maWxlKGZpbGVfaWQsIHNoZWV0X25hbWU9Tm9uZSk6CiAgICBzZXJ2aWNlID0gZ2V0X2RyaXZlX3NlcnZpY2UoKQogICAgZmlsZV9tZXRhID0gc2VydmljZS5maWxlcygpLmdldChmaWxlSWQ9ZmlsZV9pZCwgZmllbGRzPSJtaW1lVHlwZSxuYW1lIikuZXhlY3V0ZSgpCiAgICBtaW1lX3R5cGUgPSBmaWxlX21ldGEuZ2V0KCdtaW1lVHlwZScpCiAgICBpZiBtaW1lX3R5cGUgPT0gJ2FwcGxpY2F0aW9uL3ZuZC5nb29nbGUtYXBwcy5zcHJlYWRzaGVldCc6CiAgICAgICAgZmlsZV9idWZmZXIgPSBleHBvcnRfZ29vZ2xlX2ZpbGUoc2VydmljZSwgZmlsZV9pZCwgCiAgICAgICAgICAgICdhcHBsaWNhdGlvbi92bmQub3BlbnhtbGZvcm1hdHMtb2ZmaWNlZG9jdW1lbnQuc3ByZWFkc2hlZXRtbC5zaGVldCcpCiAgICBlbHNlOgogICAgICAgIGZpbGVfYnVmZmVyID0gZG93bmxvYWRfZmlsZShzZXJ2aWNlLCBmaWxlX2lkKQogICAgaWYgc2hlZXRfbmFtZToKICAgICAgICBkZiA9IHBkLnJlYWRfZXhjZWwoZmlsZV9idWZmZXIsIHNoZWV0X25hbWU9c2hlZXRfbmFtZSkKICAgICAgICByZXR1cm4geyJmaWxlX25hbWUiOiBmaWxlX21ldGEuZ2V0KCduYW1lJyksICJzaGVldCI6IHNoZWV0X25hbWUsCiAgICAgICAgICAgICAgICAiY29sdW1ucyI6IGxpc3QoZGYuY29sdW1ucyksICJyb3dfY291bnQiOiBsZW4oZGYpLCAiZGF0YSI6IGRmLmhlYWQoMTAwKS50b19kaWN0KG9yaWVudD0ncmVjb3JkcycpfQogICAgZWxzZToKICAgICAgICB4bHN4ID0gcGQuRXhjZWxGaWxlKGZpbGVfYnVmZmVyKQogICAgICAgIHNoZWV0c19kYXRhID0ge30KICAgICAgICBmb3Igc2hlZXQgaW4geGxzeC5zaGVldF9uYW1lc1s6NV06CiAgICAgICAgICAgIGRmID0gcGQucmVhZF9leGNlbCh4bHN4LCBzaGVldF9uYW1lPXNoZWV0KQogICAgICAgICAgICBzaGVldHNfZGF0YVtzaGVldF0gPSB7ImNvbHVtbnMiOiBsaXN0KGRmLmNvbHVtbnMpLCAicm93X2NvdW50IjogbGVuKGRmKSwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICJkYXRhIjogZGYuaGVhZCg1MCkudG9fZGljdChvcmllbnQ9J3JlY29yZHMnKX0KICAgICAgICByZXR1cm4geyJmaWxlX25hbWUiOiBmaWxlX21ldGEuZ2V0KCduYW1lJyksICJzaGVldHMiOiBsaXN0KHhsc3guc2hlZXRfbmFtZXMpLCAiZGF0YSI6IHNoZWV0c19kYXRhfQoKZGVmIHJlYWRfcGRmX2ZpbGUoZmlsZV9pZCwgcGFnZV9udW1iZXJzPU5vbmUpOgogICAgc2VydmljZSA9IGdldF9kcml2ZV9zZXJ2aWNlKCkKICAgIGZpbGVfbWV0YSA9IHNlcnZpY2UuZmlsZXMoKS5nZXQoZmlsZUlkPWZpbGVfaWQsIGZpZWxkcz0ibmFtZSIpLmV4ZWN1dGUoKQogICAgZmlsZV9idWZmZXIgPSBkb3dubG9hZF9maWxlKHNlcnZpY2UsIGZpbGVfaWQpCiAgICByZWFkZXIgPSBQZGZSZWFkZXIoZmlsZV9idWZmZXIpCiAgICB0b3RhbF9wYWdlcyA9IGxlbihyZWFkZXIucGFnZXMpCiAgICBwYWdlc190b19yZWFkID0gcGFnZV9udW1iZXJzIGlmIHBhZ2VfbnVtYmVycyBlbHNlIHJhbmdlKG1pbih0b3RhbF9wYWdlcywgMjApKQogICAgdGV4dF9jb250ZW50ID0gW10KICAgIGZvciBwYWdlX251bSBpbiBwYWdlc190b19yZWFkOgogICAgICAgIGlmIDAgPD0gcGFnZV9udW0gPCB0b3RhbF9wYWdlczoKICAgICAgICAgICAgdGV4dF9jb250ZW50LmFwcGVuZCh7InBhZ2UiOiBwYWdlX251bSArIDEsICJ0ZXh0IjogcmVhZGVyLnBhZ2VzW3BhZ2VfbnVtXS5leHRyYWN0X3RleHQoKX0pCiAgICByZXR1cm4geyJmaWxlX25hbWUiOiBmaWxlX21ldGEuZ2V0KCduYW1lJyksICJ0b3RhbF9wYWdlcyI6IHRvdGFsX3BhZ2VzLCAiY29udGVudCI6IHRleHRfY29udGVudH0KCmRlZiByZWFkX3Bvd2VycG9pbnRfZmlsZShmaWxlX2lkKToKICAgIHNlcnZpY2UgPSBnZXRfZHJpdmVfc2VydmljZSgpCiAgICBmaWxlX21ldGEgPSBzZXJ2aWNlLmZpbGVzKCkuZ2V0KGZpbGVJZD1maWxlX2lkLCBmaWVsZHM9Im1pbWVUeXBlLG5hbWUiKS5leGVjdXRlKCkKICAgIGlmIGZpbGVfbWV0YS5nZXQoJ21pbWVUeXBlJykgPT0gJ2FwcGxpY2F0aW9uL3ZuZC5nb29nbGUtYXBwcy5wcmVzZW50YXRpb24nOgogICAgICAgIGZpbGVfYnVmZmVyID0gZXhwb3J0X2dvb2dsZV9maWxlKHNlcnZpY2UsIGZpbGVfaWQsCiAgICAgICAgICAgICdhcHBsaWNhdGlvbi92bmQub3BlbnhtbGZvcm1hdHMtb2ZmaWNlZG9jdW1lbnQucHJlc2VudGF0aW9ubWwucHJlc2VudGF0aW9uJykKICAgIGVsc2U6CiAgICAgICAgZmlsZV9idWZmZXIgPSBkb3dubG9hZF9maWxlKHNlcnZpY2UsIGZpbGVfaWQpCiAgICBwcnMgPSBQcmVzZW50YXRpb24oZmlsZV9idWZmZXIpCiAgICBzbGlkZXMgPSBbXQogICAgZm9yIGlkeCwgc2xpZGUgaW4gZW51bWVyYXRlKHBycy5zbGlkZXMpOgogICAgICAgIHRleHQgPSAiXG4iLmpvaW4oW3NoYXBlLnRleHQgZm9yIHNoYXBlIGluIHNsaWRlLnNoYXBlcyBpZiBoYXNhdHRyKHNoYXBlLCAidGV4dCIpXSkKICAgICAgICBzbGlkZXMuYXBwZW5kKHsic2xpZGVfbnVtYmVyIjogaWR4ICsgMSwgInRleHQiOiB0ZXh0fSkKICAgIHJldHVybiB7ImZpbGVfbmFtZSI6IGZpbGVfbWV0YS5nZXQoJ25hbWUnKSwgInRvdGFsX3NsaWRlcyI6IGxlbihwcnMuc2xpZGVzKSwgInNsaWRlcyI6IHNsaWRlc30KCmRlZiByZWFkX3dvcmRfZmlsZShmaWxlX2lkKToKICAgIHNlcnZpY2UgPSBnZXRfZHJpdmVfc2VydmljZSgpCiAgICBmaWxlX21ldGEgPSBzZXJ2aWNlLmZpbGVzKCkuZ2V0KGZpbGVJZD1maWxlX2lkLCBmaWVsZHM9Im1pbWVUeXBlLG5hbWUiKS5leGVjdXRlKCkKICAgIGlmIGZpbGVfbWV0YS5nZXQoJ21pbWVUeXBlJykgPT0gJ2FwcGxpY2F0aW9uL3ZuZC5nb29nbGUtYXBwcy5kb2N1bWVudCc6CiAgICAgICAgZmlsZV9idWZmZXIgPSBleHBvcnRfZ29vZ2xlX2ZpbGUoc2VydmljZSwgZmlsZV9pZCwKICAgICAgICAgICAgJ2FwcGxpY2F0aW9uL3ZuZC5vcGVueG1sZm9ybWF0cy1vZmZpY2Vkb2N1bWVudC53b3JkcHJvY2Vzc2luZ21sLmRvY3VtZW50JykKICAgIGVsc2U6CiAgICAgICAgZmlsZV9idWZmZXIgPSBkb3dubG9hZF9maWxlKHNlcnZpY2UsIGZpbGVfaWQpCiAgICBkb2MgPSBEb2N1bWVudChmaWxlX2J1ZmZlcikKICAgIHBhcmFncmFwaHMgPSBbcC50ZXh0IGZvciBwIGluIGRvYy5wYXJhZ3JhcGhzIGlmIHAudGV4dC5zdHJpcCgpXQogICAgcmV0dXJuIHsiZmlsZV9uYW1lIjogZmlsZV9tZXRhLmdldCgnbmFtZScpLCAicGFyYWdyYXBoX2NvdW50IjogbGVuKHBhcmFncmFwaHMpLCAicGFyYWdyYXBocyI6IHBhcmFncmFwaHNbOjEwMF19CgpkZWYgcmVhZF90ZXh0X2ZpbGUoZmlsZV9pZCk6CiAgICBzZXJ2aWNlID0gZ2V0X2RyaXZlX3NlcnZpY2UoKQogICAgZmlsZV9tZXRhID0gc2VydmljZS5maWxlcygpLmdldChmaWxlSWQ9ZmlsZV9pZCwgZmllbGRzPSJuYW1lLG1pbWVUeXBlIikuZXhlY3V0ZSgpCiAgICBmaWxlX2J1ZmZlciA9IGRvd25sb2FkX2ZpbGUoc2VydmljZSwgZmlsZV9pZCkKICAgIGNvbnRlbnQgPSBmaWxlX2J1ZmZlci5yZWFkKCkuZGVjb2RlKCd1dGYtOCcsIGVycm9ycz0ncmVwbGFjZScpCiAgICByZXR1cm4geyJmaWxlX25hbWUiOiBmaWxlX21ldGEuZ2V0KCduYW1lJyksICJjb250ZW50IjogY29udGVudFs6NTAwMDBdfQoKZGVmIGdldF9maWxlX21ldGFkYXRhKGZpbGVfaWQpOgogICAgc2VydmljZSA9IGdldF9kcml2ZV9zZXJ2aWNlKCkKICAgIGYgPSBzZXJ2aWNlLmZpbGVzKCkuZ2V0KGZpbGVJZD1maWxlX2lkLAogICAgICAgIGZpZWxkcz0iaWQsbmFtZSxtaW1lVHlwZSxzaXplLGNyZWF0ZWRUaW1lLG1vZGlmaWVkVGltZSxvd25lcnMsd2ViVmlld0xpbmsiKS5leGVjdXRlKCkKICAgIHJldHVybiB7ImlkIjogZi5nZXQoJ2lkJyksICJuYW1lIjogZi5nZXQoJ25hbWUnKSwgIm1pbWVfdHlwZSI6IGYuZ2V0KCdtaW1lVHlwZScpLAogICAgICAgICAgICAic2l6ZSI6IGYuZ2V0KCdzaXplJyksICJjcmVhdGVkIjogZi5nZXQoJ2NyZWF0ZWRUaW1lJyksICJtb2RpZmllZCI6IGYuZ2V0KCdtb2RpZmllZFRpbWUnKSwKICAgICAgICAgICAgIm93bmVyIjogZi5nZXQoJ293bmVycycsIFt7fV0pWzBdLmdldCgnZW1haWxBZGRyZXNzJyksICJ3ZWJfbGluayI6IGYuZ2V0KCd3ZWJWaWV3TGluaycpfQoKZGVmIGV4ZWN1dGVfdG9vbChuYW1lLCBhcmdzKToKICAgIGlmIG5hbWUgPT0gJ2xpc3RfZm9sZGVyX2NvbnRlbnRzJzoKICAgICAgICByZXR1cm4gbGlzdF9mb2xkZXJfY29udGVudHMoYXJncy5nZXQoJ2ZvbGRlcl9pZCcpLCBhcmdzLmdldCgncGFnZV9zaXplJywgNTApKQogICAgZWxpZiBuYW1lID09ICdzZWFyY2hfZmlsZXMnOgogICAgICAgIHJldHVybiBzZWFyY2hfZmlsZXMoYXJncy5nZXQoJ3F1ZXJ5JyksIGFyZ3MuZ2V0KCdmb2xkZXJfaWQnKSwgYXJncy5nZXQoJ2ZpbGVfdHlwZScpKQogICAgZWxpZiBuYW1lID09ICdyZWFkX2V4Y2VsX2ZpbGUnOgogICAgICAgIHJldHVybiByZWFkX2V4Y2VsX2ZpbGUoYXJncy5nZXQoJ2ZpbGVfaWQnKSwgYXJncy5nZXQoJ3NoZWV0X25hbWUnKSkKICAgIGVsaWYgbmFtZSA9PSAncmVhZF9wZGZfZmlsZSc6CiAgICAgICAgcmV0dXJuIHJlYWRfcGRmX2ZpbGUoYXJncy5nZXQoJ2ZpbGVfaWQnKSwgYXJncy5nZXQoJ3BhZ2VfbnVtYmVycycpKQogICAgZWxpZiBuYW1lID09ICdyZWFkX3Bvd2VycG9pbnRfZmlsZSc6CiAgICAgICAgcmV0dXJuIHJlYWRfcG93ZXJwb2ludF9maWxlKGFyZ3MuZ2V0KCdmaWxlX2lkJykpCiAgICBlbGlmIG5hbWUgPT0gJ3JlYWRfd29yZF9maWxlJzoKICAgICAgICByZXR1cm4gcmVhZF93b3JkX2ZpbGUoYXJncy5nZXQoJ2ZpbGVfaWQnKSkKICAgIGVsaWYgbmFtZSA9PSAncmVhZF90ZXh0X2ZpbGUnOgogICAgICAgIHJldHVybiByZWFkX3RleHRfZmlsZShhcmdzLmdldCgnZmlsZV9pZCcpKQogICAgZWxpZiBuYW1lID09ICdnZXRfZmlsZV9tZXRhZGF0YSc6CiAgICAgICAgcmV0dXJuIGdldF9maWxlX21ldGFkYXRhKGFyZ3MuZ2V0KCdmaWxlX2lkJykpCiAgICBlbHNlOgogICAgICAgIHJhaXNlIFZhbHVlRXJyb3IoZiJVbmtub3duIHRvb2w6IHtuYW1lfSIpCgpAYXBwLnJvdXRlKCcvbWNwJywgbWV0aG9kcz1bJ1BPU1QnXSkKZGVmIG1jcF9oYW5kbGVyKCk6CiAgICB0cnk6CiAgICAgICAgZGF0YSA9IHJlcXVlc3QuZ2V0X2pzb24oKQogICAgZXhjZXB0OgogICAgICAgIHJldHVybiBqc29uaWZ5KHsianNvbnJwYyI6ICIyLjAiLCAiZXJyb3IiOiB7ImNvZGUiOiAtMzI3MDAsICJtZXNzYWdlIjogIlBhcnNlIGVycm9yIn0sICJpZCI6IE5vbmV9KQogICAgCiAgICBpZiBub3QgZGF0YToKICAgICAgICByZXR1cm4ganNvbmlmeSh7Impzb25ycGMiOiAiMi4wIiwgImVycm9yIjogeyJjb2RlIjogLTMyNzAwLCAibWVzc2FnZSI6ICJQYXJzZSBlcnJvciJ9LCAiaWQiOiBOb25lfSkKICAgIAogICAgbWV0aG9kID0gZGF0YS5nZXQoJ21ldGhvZCcpCiAgICBwYXJhbXMgPSBkYXRhLmdldCgncGFyYW1zJywge30pCiAgICByZXFfaWQgPSBkYXRhLmdldCgnaWQnKQogICAgc2Vzc2lvbl9pZCA9IHJlcXVlc3QuaGVhZGVycy5nZXQoJ01jcC1TZXNzaW9uLUlkJykKICAgIAogICAgcmVzcF9oZWFkZXJzID0geyJDb250ZW50LVR5cGUiOiAiYXBwbGljYXRpb24vanNvbiJ9CiAgICAKICAgIGlmIG5vdCBzZXNzaW9uX2lkIGFuZCBtZXRob2QgPT0gImluaXRpYWxpemUiOgogICAgICAgIHNlc3Npb25faWQgPSBzdHIodXVpZC51dWlkNCgpKQogICAgICAgIHNlc3Npb25zW3Nlc3Npb25faWRdID0gVHJ1ZQogICAgICAgIHJlc3BfaGVhZGVyc1siTWNwLVNlc3Npb24tSWQiXSA9IHNlc3Npb25faWQKICAgIAogICAgdHJ5OgogICAgICAgIGlmIG1ldGhvZCA9PSAnaW5pdGlhbGl6ZSc6CiAgICAgICAgICAgIHJlc3VsdCA9IHsKICAgICAgICAgICAgICAgICJwcm90b2NvbFZlcnNpb24iOiAiMjAyNC0xMS0wNSIsCiAgICAgICAgICAgICAgICAic2VydmVySW5mbyI6IHsibmFtZSI6ICJnb29nbGUtZHJpdmUtbWNwIiwgInZlcnNpb24iOiAiMi4wLjAifSwKICAgICAgICAgICAgICAgICJjYXBhYmlsaXRpZXMiOiB7InRvb2xzIjoge319CiAgICAgICAgICAgIH0KICAgICAgICBlbGlmIG1ldGhvZCA9PSAnbm90aWZpY2F0aW9ucy9pbml0aWFsaXplZCc6CiAgICAgICAgICAgIHJldHVybiAiIiwgMjA0CiAgICAgICAgZWxpZiBtZXRob2QgPT0gJ3Rvb2xzL2xpc3QnOgogICAgICAgICAgICByZXN1bHQgPSB7InRvb2xzIjogVE9PTFN9CiAgICAgICAgZWxpZiBtZXRob2QgPT0gJ3Rvb2xzL2NhbGwnOgogICAgICAgICAgICB0b29sX25hbWUgPSBwYXJhbXMuZ2V0KCduYW1lJykKICAgICAgICAgICAgdG9vbF9hcmdzID0gcGFyYW1zLmdldCgnYXJndW1lbnRzJywge30pCiAgICAgICAgICAgIHRvb2xfcmVzdWx0ID0gZXhlY3V0ZV90b29sKHRvb2xfbmFtZSwgdG9vbF9hcmdzKQogICAgICAgICAgICByZXN1bHQgPSB7ImNvbnRlbnQiOiBbeyJ0eXBlIjogInRleHQiLCAidGV4dCI6IGpzb24uZHVtcHModG9vbF9yZXN1bHQsIGluZGVudD0yLCBkZWZhdWx0PXN0cil9XX0KICAgICAgICBlbHNlOgogICAgICAgICAgICByZXR1cm4ganNvbmlmeSh7Impzb25ycGMiOiAiMi4wIiwgImVycm9yIjogeyJjb2RlIjogLTMyNjAxLCAibWVzc2FnZSI6IGYiTWV0aG9kIG5vdCBmb3VuZDoge21ldGhvZH0ifSwgImlkIjogcmVxX2lkfSksIDIwMCwgcmVzcF9oZWFkZXJzCiAgICAgICAgCiAgICAgICAgcmV0dXJuIGpzb25pZnkoeyJqc29ucnBjIjogIjIuMCIsICJyZXN1bHQiOiByZXN1bHQsICJpZCI6IHJlcV9pZH0pLCAyMDAsIHJlc3BfaGVhZGVycwogICAgCiAgICBleGNlcHQgRXhjZXB0aW9uIGFzIGU6CiAgICAgICAgcmV0dXJuIGpzb25pZnkoeyJqc29ucnBjIjogIjIuMCIsICJlcnJvciI6IHsiY29kZSI6IC0zMjAwMCwgIm1lc3NhZ2UiOiBzdHIoZSl9LCAiaWQiOiByZXFfaWR9KSwgMjAwLCByZXNwX2hlYWRlcnMKCkBhcHAucm91dGUoJy9oZWFsdGgnLCBtZXRob2RzPVsnR0VUJ10pCmRlZiBoZWFsdGgoKToKICAgIHJldHVybiBqc29uaWZ5KHsic3RhdHVzIjogImhlYWx0aHkiLCAic2VydmljZSI6ICJnb29nbGUtZHJpdmUtbWNwIn0pCgpAYXBwLnJvdXRlKCcvJywgbWV0aG9kcz1bJ0dFVCddKQpkZWYgcm9vdCgpOgogICAgcmV0dXJuIGpzb25pZnkoeyJzZXJ2aWNlIjogIkdvb2dsZSBEcml2ZSBNQ1AiLCAidmVyc2lvbiI6ICIyLjAuMCIsICJ0cmFuc3BvcnQiOiAic3RyZWFtYWJsZS1odHRwIiwgImVuZHBvaW50IjogIi9tY3AifSkKCnByaW50KCJHb29nbGUgRHJpdmUgTUNQIFNlcnZlciAoU3RyZWFtYWJsZSBIVFRQKSBzdGFydGluZy4uLiIsIGZsdXNoPVRydWUpCgppZiBfX25hbWVfXyA9PSAnX19tYWluX18nOgogICAgcG9ydCA9IGludChvcy5lbnZpcm9uLmdldCgnUE9SVCcsIDgwODApKQogICAgcHJpbnQoZiJTdGFydGluZyBzZXJ2ZXIgb24gcG9ydCB7cG9ydH0iLCBmbHVzaD1UcnVlKQogICAgYXBwLnJ1bihob3N0PScwLjAuMC4wJywgcG9ydD1wb3J0LCBkZWJ1Zz1GYWxzZSkK
+"""
+Google Drive MCP Server - Streamable HTTP transport for Claude.ai
+"""
+
+import os
+import json
+import io
+import uuid
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseDownload
+import pandas as pd
+from PyPDF2 import PdfReader
+from pptx import Presentation
+from docx import Document
+
+app = Flask(__name__)
+CORS(app, resources={r"/mcp": {"origins": "*", "methods": ["POST", "OPTIONS"], "allow_headers": ["Content-Type", "Mcp-Session-Id"]}})
+sessions = {}
+
+SCOPES = ['https://www.googleapis.com/auth/drive.readonly']
+
+def get_drive_service():
+    creds_json = os.environ.get('GOOGLE_SERVICE_ACCOUNT_JSON')
+    if not creds_json:
+        raise ValueError("GOOGLE_SERVICE_ACCOUNT_JSON environment variable not set")
+    creds_dict = json.loads(creds_json)
+    credentials = service_account.Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
+    return build('drive', 'v3', credentials=credentials)
+
+TOOLS = [
+    {
+        "name": "list_folder_contents",
+        "description": "List all files and folders in a Google Drive folder. Returns file names, IDs, types, and sizes.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "folder_id": {"type": "string", "description": "The Google Drive folder ID. Use 'root' for the root folder."},
+                "page_size": {"type": "integer", "description": "Number of files to return (max 100)", "default": 50}
+            },
+            "required": ["folder_id"]
+        }
+    },
+    {
+        "name": "search_files",
+        "description": "Search for files in Google Drive by name or content.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Search query (file name or content)"},
+                "folder_id": {"type": "string", "description": "Optional folder ID to limit search scope"},
+                "file_type": {"type": "string", "description": "Filter by file type: spreadsheet, document, pdf, presentation, folder"}
+            },
+            "required": ["query"]
+        }
+    },
+    {
+        "name": "read_excel_file",
+        "description": "Read an Excel file (.xlsx, .xls) or Google Sheet and return its contents as JSON.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "file_id": {"type": "string", "description": "The Google Drive file ID"},
+                "sheet_name": {"type": "string", "description": "Specific sheet name to read (optional)"}
+            },
+            "required": ["file_id"]
+        }
+    },
+    {
+        "name": "read_pdf_file",
+        "description": "Read a PDF file and extract its text content.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "file_id": {"type": "string", "description": "The Google Drive file ID"},
+                "page_numbers": {"type": "array", "items": {"type": "integer"}, "description": "Specific pages to read"}
+            },
+            "required": ["file_id"]
+        }
+    },
+    {
+        "name": "read_powerpoint_file",
+        "description": "Read a PowerPoint file (.pptx) or Google Slides and extract text from all slides.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"file_id": {"type": "string", "description": "The Google Drive file ID"}},
+            "required": ["file_id"]
+        }
+    },
+    {
+        "name": "read_word_file",
+        "description": "Read a Word document (.docx) or Google Doc and extract its text content.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"file_id": {"type": "string", "description": "The Google Drive file ID"}},
+            "required": ["file_id"]
+        }
+    },
+    {
+        "name": "read_text_file",
+        "description": "Read a text-based file (txt, csv, json, etc.) and return its contents.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"file_id": {"type": "string", "description": "The Google Drive file ID"}},
+            "required": ["file_id"]
+        }
+    },
+    {
+        "name": "get_file_metadata",
+        "description": "Get detailed metadata about a file including name, size, created date, modified date, owner.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"file_id": {"type": "string", "description": "The Google Drive file ID"}},
+            "required": ["file_id"]
+        }
+    }
+]
+
+def download_file(service, file_id):
+    request = service.files().get_media(fileId=file_id)
+    file_buffer = io.BytesIO()
+    downloader = MediaIoBaseDownload(file_buffer, request)
+    done = False
+    while not done:
+        status, done = downloader.next_chunk()
+    file_buffer.seek(0)
+    return file_buffer
+
+def export_google_file(service, file_id, mime_type):
+    request = service.files().export_media(fileId=file_id, mimeType=mime_type)
+    file_buffer = io.BytesIO()
+    downloader = MediaIoBaseDownload(file_buffer, request)
+    done = False
+    while not done:
+        status, done = downloader.next_chunk()
+    file_buffer.seek(0)
+    return file_buffer
+
+def list_folder_contents(folder_id, page_size=50):
+    service = get_drive_service()
+    query = f"'{folder_id}' in parents and trashed = false"
+    results = service.files().list(
+        q=query, pageSize=min(page_size, 100),
+        fields="files(id, name, mimeType, size, createdTime, modifiedTime, owners)"
+    ).execute()
+    files = results.get('files', [])
+    formatted = [{"id": f.get('id'), "name": f.get('name'), "type": f.get('mimeType'),
+                  "size": f.get('size', 'N/A'), "modified": f.get('modifiedTime')} for f in files]
+    return {"files": formatted, "count": len(formatted)}
+
+def search_files(query, folder_id=None, file_type=None):
+    service = get_drive_service()
+    search_query = f"name contains '{query}' and trashed = false"
+    if folder_id:
+        search_query += f" and '{folder_id}' in parents"
+    mime_map = {"spreadsheet": "application/vnd.google-apps.spreadsheet",
+                "document": "application/vnd.google-apps.document", "pdf": "application/pdf",
+                "presentation": "application/vnd.google-apps.presentation",
+                "folder": "application/vnd.google-apps.folder"}
+    if file_type and file_type in mime_map:
+        search_query += f" and mimeType = '{mime_map[file_type]}'"
+    results = service.files().list(q=search_query, pageSize=50,
+                                   fields="files(id, name, mimeType, size, modifiedTime)").execute()
+    return {"files": results.get('files', []), "query": search_query}
+
+def read_excel_file(file_id, sheet_name=None):
+    service = get_drive_service()
+    file_meta = service.files().get(fileId=file_id, fields="mimeType,name").execute()
+    mime_type = file_meta.get('mimeType')
+    if mime_type == 'application/vnd.google-apps.spreadsheet':
+        file_buffer = export_google_file(service, file_id, 
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    else:
+        file_buffer = download_file(service, file_id)
+    if sheet_name:
+        df = pd.read_excel(file_buffer, sheet_name=sheet_name)
+        return {"file_name": file_meta.get('name'), "sheet": sheet_name,
+                "columns": list(df.columns), "row_count": len(df), "data": df.head(100).to_dict(orient='records')}
+    else:
+        xlsx = pd.ExcelFile(file_buffer)
+        sheets_data = {}
+        for sheet in xlsx.sheet_names[:5]:
+            df = pd.read_excel(xlsx, sheet_name=sheet)
+            sheets_data[sheet] = {"columns": list(df.columns), "row_count": len(df),
+                                  "data": df.head(50).to_dict(orient='records')}
+        return {"file_name": file_meta.get('name'), "sheets": list(xlsx.sheet_names), "data": sheets_data}
+
+def read_pdf_file(file_id, page_numbers=None):
+    service = get_drive_service()
+    file_meta = service.files().get(fileId=file_id, fields="name").execute()
+    file_buffer = download_file(service, file_id)
+    reader = PdfReader(file_buffer)
+    total_pages = len(reader.pages)
+    pages_to_read = page_numbers if page_numbers else range(min(total_pages, 20))
+    text_content = []
+    for page_num in pages_to_read:
+        if 0 <= page_num < total_pages:
+            text_content.append({"page": page_num + 1, "text": reader.pages[page_num].extract_text()})
+    return {"file_name": file_meta.get('name'), "total_pages": total_pages, "content": text_content}
+
+def read_powerpoint_file(file_id):
+    service = get_drive_service()
+    file_meta = service.files().get(fileId=file_id, fields="mimeType,name").execute()
+    if file_meta.get('mimeType') == 'application/vnd.google-apps.presentation':
+        file_buffer = export_google_file(service, file_id,
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation')
+    else:
+        file_buffer = download_file(service, file_id)
+    prs = Presentation(file_buffer)
+    slides = []
+    for idx, slide in enumerate(prs.slides):
+        text = "\n".join([shape.text for shape in slide.shapes if hasattr(shape, "text")])
+        slides.append({"slide_number": idx + 1, "text": text})
+    return {"file_name": file_meta.get('name'), "total_slides": len(prs.slides), "slides": slides}
+
+def read_word_file(file_id):
+    service = get_drive_service()
+    file_meta = service.files().get(fileId=file_id, fields="mimeType,name").execute()
+    if file_meta.get('mimeType') == 'application/vnd.google-apps.document':
+        file_buffer = export_google_file(service, file_id,
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+    else:
+        file_buffer = download_file(service, file_id)
+    doc = Document(file_buffer)
+    paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
+    return {"file_name": file_meta.get('name'), "paragraph_count": len(paragraphs), "paragraphs": paragraphs[:100]}
+
+def read_text_file(file_id):
+    service = get_drive_service()
+    file_meta = service.files().get(fileId=file_id, fields="name,mimeType").execute()
+    file_buffer = download_file(service, file_id)
+    content = file_buffer.read().decode('utf-8', errors='replace')
+    return {"file_name": file_meta.get('name'), "content": content[:50000]}
+
+def get_file_metadata(file_id):
+    service = get_drive_service()
+    f = service.files().get(fileId=file_id,
+        fields="id,name,mimeType,size,createdTime,modifiedTime,owners,webViewLink").execute()
+    return {"id": f.get('id'), "name": f.get('name'), "mime_type": f.get('mimeType'),
+            "size": f.get('size'), "created": f.get('createdTime'), "modified": f.get('modifiedTime'),
+            "owner": f.get('owners', [{}])[0].get('emailAddress'), "web_link": f.get('webViewLink')}
+
+def execute_tool(name, args):
+    if name == 'list_folder_contents':
+        return list_folder_contents(args.get('folder_id'), args.get('page_size', 50))
+    elif name == 'search_files':
+        return search_files(args.get('query'), args.get('folder_id'), args.get('file_type'))
+    elif name == 'read_excel_file':
+        return read_excel_file(args.get('file_id'), args.get('sheet_name'))
+    elif name == 'read_pdf_file':
+        return read_pdf_file(args.get('file_id'), args.get('page_numbers'))
+    elif name == 'read_powerpoint_file':
+        return read_powerpoint_file(args.get('file_id'))
+    elif name == 'read_word_file':
+        return read_word_file(args.get('file_id'))
+    elif name == 'read_text_file':
+        return read_text_file(args.get('file_id'))
+    elif name == 'get_file_metadata':
+        return get_file_metadata(args.get('file_id'))
+    else:
+        raise ValueError(f"Unknown tool: {name}")
+
+@app.route('/mcp', methods=['POST', 'OPTIONS'])
+def mcp_handler():
+    if request.method == 'OPTIONS':
+        return '', 204
+    
+    try:
+        data = request.get_json()
+    except:
+        return jsonify({"jsonrpc": "2.0", "error": {"code": -32700, "message": "Parse error"}, "id": None})
+    
+    if not data:
+        return jsonify({"jsonrpc": "2.0", "error": {"code": -32700, "message": "Parse error"}, "id": None})
+    
+    method = data.get('method')
+    params = data.get('params', {})
+    req_id = data.get('id')
+    session_id = request.headers.get('Mcp-Session-Id')
+    
+    resp_headers = {"Content-Type": "application/json"}
+    
+    if not session_id and method == "initialize":
+        session_id = str(uuid.uuid4())
+        sessions[session_id] = True
+        resp_headers["Mcp-Session-Id"] = session_id
+    
+    try:
+        if method == 'initialize':
+            result = {
+                "protocolVersion": "2024-11-05",
+                "serverInfo": {"name": "google-drive-mcp", "version": "2.1.0"},
+                "capabilities": {"tools": {}}
+            }
+        elif method == 'notifications/initialized':
+            return "", 204
+        elif method == 'tools/list':
+            result = {"tools": TOOLS}
+        elif method == 'tools/call':
+            tool_name = params.get('name')
+            tool_args = params.get('arguments', {})
+            tool_result = execute_tool(tool_name, tool_args)
+            result = {"content": [{"type": "text", "text": json.dumps(tool_result, indent=2, default=str)}]}
+        else:
+            return jsonify({"jsonrpc": "2.0", "error": {"code": -32601, "message": f"Method not found: {method}"}, "id": req_id}), 200, resp_headers
+        
+        return jsonify({"jsonrpc": "2.0", "result": result, "id": req_id}), 200, resp_headers
+    
+    except Exception as e:
+        return jsonify({"jsonrpc": "2.0", "error": {"code": -32000, "message": str(e)}, "id": req_id}), 200, resp_headers
+
+@app.route('/health', methods=['GET'])
+def health():
+    return jsonify({"status": "healthy", "service": "google-drive-mcp"})
+
+@app.route('/', methods=['GET'])
+def root():
+    return jsonify({"service": "Google Drive MCP", "version": "2.1.0", "transport": "streamable-http", "endpoint": "/mcp"})
+
+print("Google Drive MCP Server (Streamable HTTP with CORS) starting...", flush=True)
+
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 8080))
+    print(f"Starting server on port {port}", flush=True)
+    app.run(host='0.0.0.0', port=port, debug=False)
