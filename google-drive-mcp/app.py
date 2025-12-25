@@ -260,26 +260,34 @@ def execute_tool(name, args):
     else:
         raise ValueError(f"Unknown tool: {name}")
 
-# SSE endpoint for Claude.ai MCP
+def generate_sse():
+    """SSE generator for MCP protocol"""
+    import time
+    # Send endpoint info for client to POST to
+    endpoint_event = {
+        "jsonrpc": "2.0",
+        "method": "endpoint",
+        "params": {"url": "/messages"}
+    }
+    yield f"event: endpoint\ndata: {json.dumps(endpoint_event)}\n\n"
+    
+    # Keep connection alive
+    while True:
+        yield f": keepalive\n\n"
+        time.sleep(30)
+
+# SSE endpoint for Claude.ai MCP - supports both /sse and /mcp paths
 @app.route('/sse', methods=['GET'])
 def mcp_sse():
     """SSE endpoint for MCP protocol - Claude.ai connects here"""
-    def generate():
-        # Send endpoint info for client to POST to
-        endpoint_event = {
-            "jsonrpc": "2.0",
-            "method": "endpoint",
-            "params": {"url": "/messages"}
-        }
-        yield f"event: endpoint\ndata: {json.dumps(endpoint_event)}\n\n"
-        
-        # Keep connection alive
-        import time
-        while True:
-            yield f": keepalive\n\n"
-            time.sleep(30)
-    
-    return Response(generate(), mimetype='text/event-stream',
+    return Response(generate_sse(), mimetype='text/event-stream',
+                    headers={'Cache-Control': 'no-cache', 'Connection': 'keep-alive',
+                             'Access-Control-Allow-Origin': '*'})
+
+@app.route('/mcp', methods=['GET'])
+def mcp_endpoint():
+    """SSE endpoint at /mcp path for Claude.ai MCP connector"""
+    return Response(generate_sse(), mimetype='text/event-stream',
                     headers={'Cache-Control': 'no-cache', 'Connection': 'keep-alive',
                              'Access-Control-Allow-Origin': '*'})
 
@@ -322,8 +330,12 @@ def health():
 
 @app.route('/', methods=['GET'])
 def root():
-    return jsonify({"service": "Google Drive MCP Server", "version": "1.0.0", "sse_endpoint": "/sse", "messages_endpoint": "/messages"})
+    return jsonify({"service": "Google Drive MCP Server", "version": "1.0.1", "sse_endpoint": "/sse", "mcp_endpoint": "/mcp", "messages_endpoint": "/messages"})
+
+# Log startup
+print("Google Drive MCP Server starting...", flush=True)
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
+    print(f"Starting server on port {port}", flush=True)
     app.run(host='0.0.0.0', port=port, debug=False)
