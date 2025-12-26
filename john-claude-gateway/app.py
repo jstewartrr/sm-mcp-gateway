@@ -1,5 +1,5 @@
 """
-John Claude Unified MCP Gateway v3 - Complete Service Catalog
+John Claude Unified MCP Gateway v4 - With RAG Semantic Search
 """
 import os, json, uuid, requests
 from flask import Flask, request, jsonify, make_response
@@ -10,10 +10,7 @@ app = Flask(__name__)
 CORS(app, resources={r"/mcp": {"origins": "*", "methods": ["POST", "OPTIONS"], "allow_headers": ["Content-Type", "Mcp-Session-Id"]}})
 
 SERVICES = {
-    # Internal - Snowflake/Hive Mind
     "snowflake": {"url": None, "type": "internal"},
-    
-    # Azure Container Apps MCPs (our deployed services)
     "google_drive": {"url": "https://google-drive-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp", "type": "http"},
     "elevenlabs": {"url": "https://elevenlabs-mcp.redglacier-26075659.eastus.azurecontainerapps.io/mcp", "type": "http"},
     "simli": {"url": "https://simli-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp", "type": "http"},
@@ -24,8 +21,6 @@ SERVICES = {
     "github": {"url": "https://github-mcp.redglacier-26075659.eastus.azurecontainerapps.io/mcp", "type": "http"},
     "azure_cli": {"url": "https://azure-cli-mcp.calmsmoke-f302257e.eastus.azurecontainerapps.io/mcp", "type": "http"},
     "gemini": {"url": "https://gemini-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp", "type": "http"},
-    
-    # Third-party SSE MCPs - require OAuth passthrough
     "asana": {"url": "https://mcp.asana.com/sse", "type": "sse"},
     "vercel": {"url": "https://mcp.vercel.com", "type": "http"},
     "make": {"url": "https://mcp.make.com", "type": "sse"},
@@ -35,6 +30,7 @@ ALL_TOOLS, TOOL_REGISTRY = [], {}
 GATEWAY_TOOLS = [
     {"name": "hive_mind_query", "description": "Query Sovereign Mind Hive Mind shared memory", "inputSchema": {"type": "object", "properties": {"sql": {"type": "string"}, "limit": {"type": "integer", "default": 10}}, "required": ["sql"]}},
     {"name": "hive_mind_write", "description": "Write to Hive Mind shared memory", "inputSchema": {"type": "object", "properties": {"category": {"type": "string"}, "summary": {"type": "string"}}, "required": ["category", "summary"]}},
+    {"name": "rag_search", "description": "Semantic search across all Sovereign Mind knowledge - returns most relevant context for any query", "inputSchema": {"type": "object", "properties": {"query": {"type": "string", "description": "Natural language query to find relevant context"}, "limit": {"type": "integer", "default": 5}}, "required": ["query"]}},
     {"name": "list_services", "description": "List all available MCP services and their status", "inputSchema": {"type": "object", "properties": {}}},
     {"name": "refresh_tools", "description": "Re-discover tools from all backend services", "inputSchema": {"type": "object", "properties": {}}}
 ]
@@ -58,17 +54,41 @@ def exec_gw(n, a):
             cur.execute(sql); r = [dict(zip([d[0] for d in cur.description], row)) for row in cur.fetchall()]; cur.close(); c.close()
             return {"success": True, "data": r}
         except Exception as e: return {"error": str(e)}
+    
     elif n == "hive_mind_write":
         try:
             c = get_sf(); cur = c.cursor()
             cur.execute(f"INSERT INTO SHARED_MEMORY (SOURCE,CATEGORY,SUMMARY,STATUS) VALUES ('GATEWAY','{a.get('category','')}','{a.get('summary','').replace(chr(39),chr(39)+chr(39))}','ACTIVE')")
             c.commit(); cur.close(); c.close(); return {"success": True}
         except Exception as e: return {"error": str(e)}
+    
+    elif n == "rag_search":
+        try:
+            c = get_sf(); cur = c.cursor()
+            query = a.get('query', '').replace("'", "''")
+            limit = a.get('limit', 5)
+            sql = f"""
+            SELECT 
+                SOURCE_TABLE,
+                CONTENT,
+                ROUND(VECTOR_COSINE_SIMILARITY(EMBEDDING, SNOWFLAKE.CORTEX.EMBED_TEXT_768('e5-base-v2', '{query}')), 3) as SIMILARITY
+            FROM SOVEREIGN_MIND.RAW.MEMORY_EMBEDDINGS
+            ORDER BY SIMILARITY DESC
+            LIMIT {limit}
+            """
+            cur.execute(sql)
+            results = [{"source": row[0], "content": row[1], "relevance": row[2]} for row in cur.fetchall()]
+            cur.close(); c.close()
+            return {"success": True, "results": results, "query": a.get('query')}
+        except Exception as e: return {"error": str(e)}
+    
     elif n == "list_services": 
         return {"services": list(SERVICES.keys()), "tools": len(ALL_TOOLS), "gateway_tools": len(GATEWAY_TOOLS)}
+    
     elif n == "refresh_tools":
         ALL_TOOLS = [t for sn,cfg in SERVICES.items() for t in discover(sn,cfg)]
         return {"success": True, "tools_discovered": len(ALL_TOOLS)}
+    
     return {"error": "Unknown gateway tool"}
 
 def discover(sn, cfg):
@@ -120,7 +140,7 @@ def mcp():
     try:
         if m == 'initialize':
             if not ALL_TOOLS: ALL_TOOLS = [t for sn,cfg in SERVICES.items() for t in discover(sn,cfg)]
-            result = {"protocolVersion":"2024-11-05","serverInfo":{"name":"john-claude-gateway","version":"3.0"},"capabilities":{"tools":{}}}
+            result = {"protocolVersion":"2024-11-05","serverInfo":{"name":"john-claude-gateway","version":"4.0-rag"},"capabilities":{"tools":{}}}
         elif m == 'notifications/initialized': return '', 204
         elif m == 'tools/list': result = {"tools": GATEWAY_TOOLS + ALL_TOOLS}
         elif m == 'tools/call':
@@ -136,12 +156,12 @@ def mcp():
     except Exception as e: return jsonify({"jsonrpc":"2.0","error":{"code":-32000,"message":str(e)},"id":rid})
 
 @app.route('/health')
-def health(): return jsonify({"status":"ok","version":"3.0","services":len(SERVICES),"tools":len(ALL_TOOLS)})
+def health(): return jsonify({"status":"ok","version":"4.0-rag","services":len(SERVICES),"tools":len(ALL_TOOLS),"rag_enabled":True})
 
 @app.route('/')
-def root(): return jsonify({"service":"John Claude Unified Gateway","version":"3.0","endpoint":"/mcp","services":list(SERVICES.keys())})
+def root(): return jsonify({"service":"John Claude Unified Gateway","version":"4.0-rag","endpoint":"/mcp","services":list(SERVICES.keys()),"features":["rag_search","hive_mind"]})
 
 if __name__ == '__main__':
     ALL_TOOLS = [t for sn,cfg in SERVICES.items() for t in discover(sn,cfg)]
-    print(f"Gateway started with {len(SERVICES)} services and {len(ALL_TOOLS)} tools")
+    print(f"Gateway v4 (RAG) started with {len(SERVICES)} services and {len(ALL_TOOLS)} tools")
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT',8080)))
