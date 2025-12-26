@@ -1,5 +1,5 @@
 """
-John Claude Unified MCP Gateway
+John Claude Unified MCP Gateway - All Services
 """
 import os, json, uuid, requests
 from flask import Flask, request, jsonify, make_response
@@ -9,9 +9,21 @@ import snowflake.connector
 app = Flask(__name__)
 CORS(app, resources={r"/mcp": {"origins": "*", "methods": ["POST", "OPTIONS"], "allow_headers": ["Content-Type", "Mcp-Session-Id"]}})
 
-SERVICES = {"snowflake": {"url": None, "type": "internal"}, "google_drive": {"url": "https://google-drive-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp", "type": "http"}, "elevenlabs": {"url": "https://elevenlabs-mcp.redglacier-26075659.eastus.azurecontainerapps.io/mcp", "type": "http"}, "simli": {"url": "https://simli-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp", "type": "http"}, "notebooklm": {"url": "https://notebooklm-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp", "type": "http"}}
+SERVICES = {
+    "snowflake": {"url": None, "type": "internal"},
+    "google_drive": {"url": "https://google-drive-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp", "type": "http"},
+    "elevenlabs": {"url": "https://elevenlabs-mcp.redglacier-26075659.eastus.azurecontainerapps.io/mcp", "type": "http"},
+    "simli": {"url": "https://simli-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp", "type": "http"},
+    "notebooklm": {"url": "https://notebooklm-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp", "type": "http"},
+    "vertex_ai": {"url": "https://vertex-ai-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp", "type": "http"},
+    "figma": {"url": "https://figma-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp", "type": "http"},
+    "vectorizer": {"url": "https://slide-transform-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp", "type": "http"},
+    "github": {"url": "https://github-mcp.redglacier-26075659.eastus.azurecontainerapps.io/mcp", "type": "http"},
+    "azure_cli": {"url": "https://azure-cli-mcp.calmsmoke-f302257e.eastus.azurecontainerapps.io/mcp", "type": "http"},
+    "gemini": {"url": "https://gemini-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp", "type": "http"},
+}
 ALL_TOOLS, TOOL_REGISTRY = [], {}
-GATEWAY_TOOLS = [{"name": "hive_mind_query", "description": "Query Hive Mind", "inputSchema": {"type": "object", "properties": {"sql": {"type": "string"}, "limit": {"type": "integer", "default": 10}}, "required": ["sql"]}}, {"name": "hive_mind_write", "description": "Write to Hive Mind", "inputSchema": {"type": "object", "properties": {"category": {"type": "string"}, "summary": {"type": "string"}}, "required": ["category", "summary"]}}, {"name": "list_services", "description": "List MCP services", "inputSchema": {"type": "object", "properties": {}}}]
+GATEWAY_TOOLS = [{"name": "hive_mind_query", "description": "Query Sovereign Mind Hive Mind shared memory", "inputSchema": {"type": "object", "properties": {"sql": {"type": "string"}, "limit": {"type": "integer", "default": 10}}, "required": ["sql"]}}, {"name": "hive_mind_write", "description": "Write to Hive Mind shared memory", "inputSchema": {"type": "object", "properties": {"category": {"type": "string"}, "summary": {"type": "string"}}, "required": ["category", "summary"]}}, {"name": "list_services", "description": "List all available MCP services", "inputSchema": {"type": "object", "properties": {}}}]
 
 def get_sf(): return snowflake.connector.connect(user=os.environ.get('SNOWFLAKE_USER','JOHN_CLAUDE'), password=os.environ.get('SNOWFLAKE_PASSWORD'), account=os.environ.get('SNOWFLAKE_ACCOUNT'), warehouse='SOVEREIGN_MIND_WH', database='SOVEREIGN_MIND', schema='RAW')
 
@@ -35,9 +47,9 @@ def exec_gw(n, a):
 def discover(sn, cfg):
     if cfg["type"] == "internal": return []
     try:
-        r = requests.post(cfg["url"], json={"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{}},"id":1}, timeout=10)
+        r = requests.post(cfg["url"], json={"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{}},"id":1}, timeout=15)
         if r.status_code == 200:
-            tr = requests.post(cfg["url"], json={"jsonrpc":"2.0","method":"tools/list","params":{},"id":2}, timeout=10)
+            tr = requests.post(cfg["url"], json={"jsonrpc":"2.0","method":"tools/list","params":{},"id":2}, timeout=15)
             if tr.status_code == 200:
                 tools = []
                 for t in tr.json().get("result",{}).get("tools",[]):
@@ -51,7 +63,7 @@ def proxy(sn, orig, args):
     cfg = SERVICES.get(sn)
     if not cfg: return {"error": "Unknown"}
     try:
-        r = requests.post(cfg["url"], json={"jsonrpc":"2.0","method":"tools/call","params":{"name":orig,"arguments":args},"id":3}, timeout=60)
+        r = requests.post(cfg["url"], json={"jsonrpc":"2.0","method":"tools/call","params":{"name":orig,"arguments":args},"id":3}, timeout=120)
         return r.json().get("result",{}) if r.status_code == 200 else {"error": str(r.status_code)}
     except Exception as e: return {"error": str(e)}
 
@@ -66,7 +78,7 @@ def mcp():
     try:
         if m == 'initialize':
             if not ALL_TOOLS: ALL_TOOLS = [t for sn,cfg in SERVICES.items() for t in discover(sn,cfg)]
-            result = {"protocolVersion":"2024-11-05","serverInfo":{"name":"john-claude-gateway","version":"1.0"},"capabilities":{"tools":{}}}
+            result = {"protocolVersion":"2024-11-05","serverInfo":{"name":"john-claude-gateway","version":"2.0"},"capabilities":{"tools":{}}}
         elif m == 'notifications/initialized': return '', 204
         elif m == 'tools/list': result = {"tools": GATEWAY_TOOLS + ALL_TOOLS}
         elif m == 'tools/call':
@@ -82,10 +94,10 @@ def mcp():
     except Exception as e: return jsonify({"jsonrpc":"2.0","error":{"code":-32000,"message":str(e)},"id":rid})
 
 @app.route('/health')
-def health(): return jsonify({"status":"ok","tools":len(ALL_TOOLS)})
+def health(): return jsonify({"status":"ok","services":len(SERVICES),"tools":len(ALL_TOOLS)})
 
 @app.route('/')
-def root(): return jsonify({"service":"John Claude Gateway","endpoint":"/mcp","services":list(SERVICES.keys())})
+def root(): return jsonify({"service":"John Claude Unified Gateway","version":"2.0","endpoint":"/mcp","services":list(SERVICES.keys())})
 
 if __name__ == '__main__':
     ALL_TOOLS = [t for sn,cfg in SERVICES.items() for t in discover(sn,cfg)]
