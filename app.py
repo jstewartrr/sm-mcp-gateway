@@ -1,5 +1,5 @@
 """
-Sovereign Mind MCP Gateway v1.2.0
+Sovereign Mind MCP Gateway v1.3.0
 =================================
 A unified MCP server with integrated web scraper support.
 """
@@ -90,6 +90,12 @@ BACKEND_MCPS = {
         "url": os.environ.get("MCP_FIGMA_URL", "https://figma-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
         "prefix": "figma",
         "description": "Figma design files (read-only)",
+        "enabled": True
+    },
+    "dealcloud": {
+        "url": os.environ.get("MCP_DEALCLOUD_URL", "https://dealcloud-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
+        "prefix": "dc",
+        "description": "DealCloud CRM (deals, companies, interactions)",
         "enabled": True
     }
 }
@@ -187,7 +193,7 @@ def handle_initialize(params):
     return {
         "protocolVersion": "2024-11-05",
         "capabilities": {"tools": {"listChanged": True}},
-        "serverInfo": {"name": "sovereign-mind-gateway", "version": "1.2.0"}
+        "serverInfo": {"name": "sovereign-mind-gateway", "version": "1.3.0"}
     }
 
 def handle_tools_list(params):
@@ -244,15 +250,9 @@ def health_check():
     return jsonify({
         "status": "healthy",
         "service": "sovereign-mind-gateway",
-        "version": "1.2.0",
+        "version": "1.3.0",
         "features": ["mcp-proxy", "sse-transport", "web-scrapers"],
-        "scrapers": {
-            "gfdata": {
-                "path": "/app/scrapers/gfdata/gfdata_bot.py",
-                "profiles": ["mgc_core", "distribution_only", "manufacturing_only", "full_lower_middle_market"],
-                "trigger": "POST /scrapers/gfdata/run"
-            }
-        },
+        "backends": list(BACKEND_MCPS.keys()),
         "total_tools": len(catalog.tools) if catalog.tools else "not yet loaded"
     })
 
@@ -341,14 +341,6 @@ def list_tools():
 
 @app.route("/scrapers/gfdata/run", methods=["POST"])
 def run_gfdata_scraper():
-    """
-    Trigger the GF Data scraper.
-    
-    POST body (optional):
-    {
-        "profile": "mgc_core|distribution_only|manufacturing_only|full_lower_middle_market"
-    }
-    """
     profile = request.json.get("profile", "mgc_core") if request.json else "mgc_core"
     valid_profiles = ["mgc_core", "distribution_only", "manufacturing_only", "full_lower_middle_market"]
     
@@ -391,7 +383,6 @@ def run_gfdata_scraper():
 
 @app.route("/scrapers/gfdata/status", methods=["GET"])
 def gfdata_status():
-    """Check GF Data scraper status and last run info."""
     import snowflake.connector
     
     try:
@@ -453,7 +444,7 @@ def gfdata_status():
 # =============================================================================
 
 if __name__ == "__main__":
-    logger.info("Sovereign Mind MCP Gateway v1.2.0 starting...")
+    logger.info("Sovereign Mind MCP Gateway v1.3.0 starting...")
     run_async(catalog.refresh())
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
