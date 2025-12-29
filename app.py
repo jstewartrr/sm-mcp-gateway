@@ -1,7 +1,8 @@
 """
-Sovereign Mind MCP Gateway v1.3.0
+Sovereign Mind MCP Gateway v1.4.0
 =================================
 A unified MCP server with integrated web scraper support.
+Added: Make.com MCP backend
 """
 
 import os
@@ -96,6 +97,12 @@ BACKEND_MCPS = {
         "url": os.environ.get("MCP_DEALCLOUD_URL", "https://dealcloud-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
         "prefix": "dc",
         "description": "DealCloud CRM (deals, companies, interactions)",
+        "enabled": True
+    },
+    "make": {
+        "url": os.environ.get("MCP_MAKE_URL", "https://us1.make.com/mcp/api/v1/u/7129f411-923e-4acd-b63f-d436d38939dc/stateless"),
+        "prefix": "make",
+        "description": "Make.com automation scenarios",
         "enabled": True
     }
 }
@@ -193,7 +200,7 @@ def handle_initialize(params):
     return {
         "protocolVersion": "2024-11-05",
         "capabilities": {"tools": {"listChanged": True}},
-        "serverInfo": {"name": "sovereign-mind-gateway", "version": "1.3.0"}
+        "serverInfo": {"name": "sovereign-mind-gateway", "version": "1.4.0"}
     }
 
 def handle_tools_list(params):
@@ -250,7 +257,7 @@ def health_check():
     return jsonify({
         "status": "healthy",
         "service": "sovereign-mind-gateway",
-        "version": "1.3.0",
+        "version": "1.4.0",
         "features": ["mcp-proxy", "sse-transport", "web-scrapers"],
         "backends": list(BACKEND_MCPS.keys()),
         "total_tools": len(catalog.tools) if catalog.tools else "not yet loaded"
@@ -444,7 +451,7 @@ def gfdata_status():
 # =============================================================================
 
 if __name__ == "__main__":
-    logger.info("Sovereign Mind MCP Gateway v1.3.0 starting...")
+    logger.info("Sovereign Mind MCP Gateway v1.4.0 starting...")
     run_async(catalog.refresh())
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
