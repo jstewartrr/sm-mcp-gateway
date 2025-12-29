@@ -1,8 +1,8 @@
 """
-Sovereign Mind MCP Gateway v1.4.0
+Sovereign Mind MCP Gateway v1.4.1
 =================================
 A unified MCP server with integrated web scraper support.
-Added: Make.com MCP backend
+Added: Make.com MCP backend with proper zone and SSE handling
 """
 
 import os
@@ -13,6 +13,7 @@ import uuid
 import queue
 import subprocess
 import sys
+import re
 from flask import Flask, request, jsonify, Response
 import logging
 from datetime import datetime
@@ -31,85 +32,111 @@ BACKEND_MCPS = {
         "url": os.environ.get("MCP_SNOWFLAKE_URL", "https://john-claude-mcp.wittyplant-239da1c3.eastus.azurecontainerapps.io/mcp"),
         "prefix": "sm",
         "description": "Sovereign Mind Snowflake database (JOHN_CLAUDE user)",
-        "enabled": True
+        "enabled": True,
+        "transport": "json"
     },
     "googledrive": {
         "url": os.environ.get("MCP_GOOGLEDRIVE_URL", "https://google-drive-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
         "prefix": "drive",
         "description": "Google Drive file access (service account)",
-        "enabled": True
+        "enabled": True,
+        "transport": "json"
     },
     "github": {
         "url": os.environ.get("MCP_GITHUB_URL", "https://github-mcp.redglacier-26075659.eastus.azurecontainerapps.io/mcp"),
         "prefix": "github",
         "description": "GitHub repositories",
-        "enabled": True
+        "enabled": True,
+        "transport": "json"
     },
     "gemini": {
         "url": os.environ.get("MCP_GEMINI_URL", "https://gemini-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
         "prefix": "gemini",
         "description": "Google Gemini AI",
-        "enabled": True
+        "enabled": True,
+        "transport": "json"
     },
     "notebooklm": {
         "url": os.environ.get("MCP_NOTEBOOKLM_URL", "https://notebooklm-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
         "prefix": "notebook",
         "description": "NotebookLM notebooks",
-        "enabled": True
+        "enabled": True,
+        "transport": "json"
     },
     "vertex": {
         "url": os.environ.get("MCP_VERTEX_URL", "https://vertex-ai-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
         "prefix": "vertex",
         "description": "Vertex AI (Imagen, Vision, Document AI)",
-        "enabled": True
+        "enabled": True,
+        "transport": "json"
     },
     "azure": {
         "url": os.environ.get("MCP_AZURE_URL", "https://azure-cli-mcp.calmsmoke-f302257e.eastus.azurecontainerapps.io/mcp"),
         "prefix": "azure",
         "description": "Azure CLI commands",
-        "enabled": True
+        "enabled": True,
+        "transport": "json"
     },
     "elevenlabs": {
         "url": os.environ.get("MCP_ELEVENLABS_URL", "https://elevenlabs-mcp.redglacier-26075659.eastus.azurecontainerapps.io/mcp"),
         "prefix": "voice",
         "description": "ElevenLabs voice agents",
-        "enabled": True
+        "enabled": True,
+        "transport": "json"
     },
     "simli": {
         "url": os.environ.get("MCP_SIMLI_URL", "https://simli-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
         "prefix": "avatar",
         "description": "Simli visual avatars",
-        "enabled": True
+        "enabled": True,
+        "transport": "json"
     },
     "vectorizer": {
         "url": os.environ.get("MCP_VECTORIZER_URL", "https://slide-transform-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
         "prefix": "vector",
         "description": "Image vectorization and slide transformation",
-        "enabled": True
+        "enabled": True,
+        "transport": "json"
     },
     "figma": {
         "url": os.environ.get("MCP_FIGMA_URL", "https://figma-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
         "prefix": "figma",
         "description": "Figma design files (read-only)",
-        "enabled": True
+        "enabled": True,
+        "transport": "json"
     },
     "dealcloud": {
         "url": os.environ.get("MCP_DEALCLOUD_URL", "https://dealcloud-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
         "prefix": "dc",
         "description": "DealCloud CRM (deals, companies, interactions)",
-        "enabled": True
+        "enabled": True,
+        "transport": "json"
     },
     "make": {
-        "url": os.environ.get("MCP_MAKE_URL", "https://us1.make.com/mcp/api/v1/u/7129f411-923e-4acd-b63f-d436d38939dc/stateless"),
+        "url": os.environ.get("MCP_MAKE_URL", "https://us2.make.com/mcp/u/7129f411-923e-4acd-b63f-d436d38939dc/stateless"),
         "prefix": "make",
         "description": "Make.com automation scenarios",
-        "enabled": True
+        "enabled": True,
+        "transport": "sse",
+        "headers": {
+            "Accept": "application/json, text/event-stream"
+        }
     }
 }
 
 # =============================================================================
 # TOOL CATALOG CACHE
 # =============================================================================
+
+def parse_sse_response(text):
+    """Parse SSE response format: event: message\ndata: {...}"""
+    for line in text.split('\n'):
+        if line.startswith('data: '):
+            try:
+                return json.loads(line[6:])
+            except json.JSONDecodeError:
+                continue
+    return None
 
 class ToolCatalog:
     def __init__(self):
@@ -126,20 +153,33 @@ class ToolCatalog:
         logger.info("Refreshing tool catalog from backend MCPs...")
         new_tools = {}
         
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=30.0, verify=False) as client:
             for backend_name, config in BACKEND_MCPS.items():
                 if not config.get("enabled", False):
                     continue
                 
                 try:
+                    headers = {"Content-Type": "application/json"}
+                    if config.get("headers"):
+                        headers.update(config["headers"])
+                    
                     response = await client.post(
                         config["url"],
                         json={"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}},
-                        headers={"Content-Type": "application/json"}
+                        headers=headers
                     )
                     
                     if response.status_code == 200:
-                        data = response.json()
+                        # Handle SSE transport (Make.com)
+                        if config.get("transport") == "sse":
+                            data = parse_sse_response(response.text)
+                        else:
+                            data = response.json()
+                        
+                        if not data:
+                            logger.warning(f"  FAIL {backend_name}: Could not parse response")
+                            continue
+                            
                         tools = data.get("result", {}).get("tools", [])
                         prefix = config["prefix"]
                         
@@ -150,6 +190,8 @@ class ToolCatalog:
                                 "backend": backend_name,
                                 "backend_url": config["url"],
                                 "original_name": original_name,
+                                "transport": config.get("transport", "json"),
+                                "headers": config.get("headers", {}),
                                 "schema": {
                                     "name": prefixed_name,
                                     "description": f"[{prefix.upper()}] {tool.get('description', '')}",
@@ -187,20 +229,27 @@ def run_async(coro):
     finally:
         loop.close()
 
-async def call_backend_tool(backend_url: str, tool_name: str, arguments: dict):
-    async with httpx.AsyncClient(timeout=60.0) as client:
+async def call_backend_tool(backend_url: str, tool_name: str, arguments: dict, transport: str = "json", extra_headers: dict = None):
+    headers = {"Content-Type": "application/json"}
+    if extra_headers:
+        headers.update(extra_headers)
+    
+    async with httpx.AsyncClient(timeout=60.0, verify=False) as client:
         response = await client.post(
             backend_url,
             json={"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": tool_name, "arguments": arguments}},
-            headers={"Content-Type": "application/json"}
+            headers=headers
         )
+        
+        if transport == "sse":
+            return parse_sse_response(response.text)
         return response.json()
 
 def handle_initialize(params):
     return {
         "protocolVersion": "2024-11-05",
         "capabilities": {"tools": {"listChanged": True}},
-        "serverInfo": {"name": "sovereign-mind-gateway", "version": "1.4.0"}
+        "serverInfo": {"name": "sovereign-mind-gateway", "version": "1.4.1"}
     }
 
 def handle_tools_list(params):
@@ -217,13 +266,19 @@ def handle_tools_call(params):
         return {"content": [{"type": "text", "text": f"Error: Unknown tool '{tool_name}'"}], "isError": True}
     
     try:
-        result = run_async(call_backend_tool(tool_info["backend_url"], tool_info["original_name"], arguments))
-        if "result" in result:
+        result = run_async(call_backend_tool(
+            tool_info["backend_url"], 
+            tool_info["original_name"], 
+            arguments,
+            tool_info.get("transport", "json"),
+            tool_info.get("headers", {})
+        ))
+        if result and "result" in result:
             return result["result"]
-        elif "error" in result:
+        elif result and "error" in result:
             return {"content": [{"type": "text", "text": f"Backend error: {result['error']}"}], "isError": True}
         else:
-            return result
+            return result if result else {"content": [{"type": "text", "text": "No response from backend"}], "isError": True}
     except Exception as e:
         logger.error(f"Error calling backend tool: {e}")
         return {"content": [{"type": "text", "text": f"Error calling tool: {str(e)}"}], "isError": True}
@@ -257,8 +312,8 @@ def health_check():
     return jsonify({
         "status": "healthy",
         "service": "sovereign-mind-gateway",
-        "version": "1.4.0",
-        "features": ["mcp-proxy", "sse-transport", "web-scrapers"],
+        "version": "1.4.1",
+        "features": ["mcp-proxy", "sse-transport", "web-scrapers", "make-sse-support"],
         "backends": list(BACKEND_MCPS.keys()),
         "total_tools": len(catalog.tools) if catalog.tools else "not yet loaded"
     })
@@ -451,7 +506,7 @@ def gfdata_status():
 # =============================================================================
 
 if __name__ == "__main__":
-    logger.info("Sovereign Mind MCP Gateway v1.4.0 starting...")
+    logger.info("Sovereign Mind MCP Gateway v1.4.1 starting...")
     run_async(catalog.refresh())
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
