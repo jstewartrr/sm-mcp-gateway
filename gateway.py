@@ -990,6 +990,89 @@ async def gateway_status(params: GatewayStatusInput) -> str:
 # MAIN ENTRY POINT
 # ============================================================================
 
+
+# ============================================================================
+# MAC STUDIO TOOLS (via Tailscale Funnel)
+# ============================================================================
+
+MAC_STUDIO_URL = os.getenv("MAC_STUDIO_URL", "https://mac-studio-1556.tailfb6577.ts.net")
+
+class MacRunCommandInput(BaseModel):
+    """Input for running a command on Mac Studio."""
+    command: str = Field(..., description="Shell command to execute on Mac Studio")
+
+@mcp.tool(
+    name="mac_run_command",
+    annotations={
+        "title": "[MAC] Run Command on Mac Studio",
+        "readOnlyHint": False,
+        "destructiveHint": True,
+        "idempotentHint": False,
+        "openWorldHint": True
+    }
+)
+async def mac_run_command(params: MacRunCommandInput) -> str:
+    """Execute a shell command on Mac Studio via Tailscale Funnel."""
+    result = await make_api_request(
+        method="POST",
+        url=f"{MAC_STUDIO_URL}/run",
+        headers={"Content-Type": "application/json"},
+        json_data={"command": params.command},
+        timeout=120.0
+    )
+    return json.dumps(result, indent=2)
+
+class MacSSHCommandInput(BaseModel):
+    """Input for running a command on Raspberry Pi via Mac Studio SSH."""
+    command: str = Field(..., description="Command to execute on the Pi")
+    host: str = Field(default="192.168.25.225", description="Pi IP address")
+    user: str = Field(default="jstewartrr", description="SSH username")
+
+@mcp.tool(
+    name="mac_ssh_to_pi",
+    annotations={
+        "title": "[MAC] SSH Command to Raspberry Pi",
+        "readOnlyHint": False,
+        "destructiveHint": True,
+        "idempotentHint": False,
+        "openWorldHint": True
+    }
+)
+async def mac_ssh_to_pi(params: MacSSHCommandInput) -> str:
+    """Execute a command on Raspberry Pi via SSH through Mac Studio."""
+    result = await make_api_request(
+        method="POST",
+        url=f"{MAC_STUDIO_URL}/ssh",
+        headers={"Content-Type": "application/json"},
+        json_data={"command": params.command, "host": params.host, "user": params.user},
+        timeout=60.0
+    )
+    return json.dumps(result, indent=2)
+
+class MacHealthInput(BaseModel):
+    """Input for Mac Studio health check."""
+    pass
+
+@mcp.tool(
+    name="mac_health",
+    annotations={
+        "title": "[MAC] Mac Studio Health Check",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True
+    }
+)
+async def mac_health(params: MacHealthInput) -> str:
+    """Check if Mac Studio is reachable."""
+    result = await make_api_request(
+        method="GET",
+        url=f"{MAC_STUDIO_URL}/health",
+        headers={},
+        timeout=10.0
+    )
+    return json.dumps(result, indent=2)
+
 if __name__ == "__main__":
     import sys
     
