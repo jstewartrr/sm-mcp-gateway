@@ -1,8 +1,14 @@
 """
-Sovereign Mind MCP Gateway v1.7.0
-=================================
-A unified MCP server with integrated web scraper support.
-Added: Microsoft 365 MCP backend for email, calendar, users
+Sovereign Mind MCP Gateway v2.0.0
+==================================
+A unified, production-ready MCP server with comprehensive backend support.
+All backends configured with proper error handling and graceful fallback.
+
+Backends: Snowflake, Google Drive, GitHub, M365, Asana, ElevenLabs, DealCloud,
+          Make.com, Tailscale, Gemini, NotebookLM, Vertex AI, Azure CLI,
+          Simli, Vectorizer, Figma, Mac Studio (Tailscale Funnel)
+
+Author: ABBI (Adaptive Second Brain Intelligence)
 """
 
 import os
@@ -13,104 +19,79 @@ import uuid
 import queue
 import subprocess
 import sys
-import re
 from flask import Flask, request, jsonify, Response
 import logging
 from datetime import datetime
+from typing import Optional, Dict, Any
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-
-# =============================================================================
-# BACKEND MCP SERVER CONFIGURATION
-# =============================================================================
 
 BACKEND_MCPS = {
     "snowflake": {
         "url": os.environ.get("MCP_SNOWFLAKE_URL", "https://john-claude-mcp.wittyplant-239da1c3.eastus.azurecontainerapps.io/mcp"),
         "prefix": "sm",
-        "description": "Sovereign Mind Snowflake database (JOHN_CLAUDE user)",
+        "description": "Sovereign Mind Snowflake database (SOVEREIGN_MIND, HURRICANE)",
         "enabled": True,
-        "transport": "json"
+        "transport": "json",
+        "priority": 1,
+        "health_check": True
     },
     "googledrive": {
         "url": os.environ.get("MCP_GOOGLEDRIVE_URL", "https://google-drive-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
         "prefix": "drive",
         "description": "Google Drive file access (service account)",
         "enabled": True,
-        "transport": "json"
+        "transport": "json",
+        "priority": 1,
+        "health_check": True
+    },
+    "m365": {
+        "url": os.environ.get("MCP_M365_URL", "https://m365-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
+        "prefix": "m365",
+        "description": "Microsoft 365 email, calendar, users (MiddleGround tenant)",
+        "enabled": True,
+        "transport": "json",
+        "priority": 1,
+        "health_check": True
+    },
+    "asana": {
+        "url": os.environ.get("MCP_ASANA_URL", "https://asana-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
+        "prefix": "asana",
+        "description": "Asana project management",
+        "enabled": True,
+        "transport": "json",
+        "priority": 1,
+        "health_check": True
     },
     "github": {
         "url": os.environ.get("MCP_GITHUB_URL", "https://github-mcp.redglacier-26075659.eastus.azurecontainerapps.io/mcp"),
         "prefix": "github",
-        "description": "GitHub repositories",
+        "description": "GitHub repositories (jstewartrr)",
         "enabled": True,
-        "transport": "json"
-    },
-    "gemini": {
-        "url": os.environ.get("MCP_GEMINI_URL", "https://gemini-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
-        "prefix": "gemini",
-        "description": "Google Gemini AI",
-        "enabled": True,
-        "transport": "json"
-    },
-    "notebooklm": {
-        "url": os.environ.get("MCP_NOTEBOOKLM_URL", "https://notebooklm-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
-        "prefix": "notebook",
-        "description": "NotebookLM notebooks",
-        "enabled": True,
-        "transport": "json"
-    },
-    "vertex": {
-        "url": os.environ.get("MCP_VERTEX_URL", "https://vertex-ai-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
-        "prefix": "vertex",
-        "description": "Vertex AI (Imagen, Vision, Document AI)",
-        "enabled": True,
-        "transport": "json"
+        "transport": "json",
+        "priority": 1,
+        "health_check": True
     },
     "azure": {
         "url": os.environ.get("MCP_AZURE_URL", "https://azure-cli-mcp.calmsmoke-f302257e.eastus.azurecontainerapps.io/mcp"),
         "prefix": "azure",
         "description": "Azure CLI commands",
         "enabled": True,
-        "transport": "json"
-    },
-    "elevenlabs": {
-        "url": os.environ.get("MCP_ELEVENLABS_URL", "https://elevenlabs-mcp.redglacier-26075659.eastus.azurecontainerapps.io/mcp"),
-        "prefix": "voice",
-        "description": "ElevenLabs voice agents",
-        "enabled": True,
-        "transport": "json"
-    },
-    "simli": {
-        "url": os.environ.get("MCP_SIMLI_URL", "https://simli-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
-        "prefix": "avatar",
-        "description": "Simli visual avatars",
-        "enabled": True,
-        "transport": "json"
-    },
-    "vectorizer": {
-        "url": os.environ.get("MCP_VECTORIZER_URL", "https://slide-transform-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
-        "prefix": "vector",
-        "description": "Image vectorization and slide transformation",
-        "enabled": True,
-        "transport": "json"
-    },
-    "figma": {
-        "url": os.environ.get("MCP_FIGMA_URL", "https://figma-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
-        "prefix": "figma",
-        "description": "Figma design files (read-only)",
-        "enabled": True,
-        "transport": "json"
+        "transport": "json",
+        "priority": 2,
+        "health_check": True
     },
     "dealcloud": {
         "url": os.environ.get("MCP_DEALCLOUD_URL", "https://dealcloud-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
         "prefix": "dc",
-        "description": "DealCloud CRM (deals, companies, interactions)",
+        "description": "DealCloud CRM",
         "enabled": True,
-        "transport": "json"
+        "transport": "json",
+        "priority": 1,
+        "health_check": True
     },
     "make": {
         "url": os.environ.get("MCP_MAKE_URL", "https://us2.make.com/mcp/u/7129f411-923e-4acd-b63f-d436d38939dc/stateless"),
@@ -118,38 +99,96 @@ BACKEND_MCPS = {
         "description": "Make.com automation scenarios",
         "enabled": True,
         "transport": "sse",
-        "headers": {
-            "Accept": "application/json, text/event-stream"
-        }
+        "priority": 2,
+        "health_check": False,
+        "timeout": 120,
+        "headers": {"Accept": "application/json, text/event-stream"}
+    },
+    "elevenlabs": {
+        "url": os.environ.get("MCP_ELEVENLABS_URL", "https://elevenlabs-mcp.redglacier-26075659.eastus.azurecontainerapps.io/mcp"),
+        "prefix": "voice",
+        "description": "ElevenLabs voice agents (ABBI)",
+        "enabled": True,
+        "transport": "json",
+        "priority": 2,
+        "health_check": True
+    },
+    "simli": {
+        "url": os.environ.get("MCP_SIMLI_URL", "https://simli-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
+        "prefix": "avatar",
+        "description": "Simli visual avatars",
+        "enabled": True,
+        "transport": "json",
+        "priority": 3,
+        "health_check": True
+    },
+    "gemini": {
+        "url": os.environ.get("MCP_GEMINI_URL", "https://gemini-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
+        "prefix": "gemini",
+        "description": "Google Gemini AI",
+        "enabled": True,
+        "transport": "json",
+        "priority": 2,
+        "health_check": True
+    },
+    "notebooklm": {
+        "url": os.environ.get("MCP_NOTEBOOKLM_URL", "https://notebooklm-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
+        "prefix": "notebook",
+        "description": "NotebookLM notebooks",
+        "enabled": True,
+        "transport": "json",
+        "priority": 3,
+        "health_check": True
+    },
+    "vertex": {
+        "url": os.environ.get("MCP_VERTEX_URL", "https://vertex-ai-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
+        "prefix": "vertex",
+        "description": "Vertex AI",
+        "enabled": True,
+        "transport": "json",
+        "priority": 2,
+        "health_check": True
+    },
+    "figma": {
+        "url": os.environ.get("MCP_FIGMA_URL", "https://figma-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
+        "prefix": "figma",
+        "description": "Figma design files",
+        "enabled": True,
+        "transport": "json",
+        "priority": 3,
+        "health_check": True
+    },
+    "vectorizer": {
+        "url": os.environ.get("MCP_VECTORIZER_URL", "https://slide-transform-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
+        "prefix": "vector",
+        "description": "Image vectorization",
+        "enabled": True,
+        "transport": "json",
+        "priority": 3,
+        "health_check": True
     },
     "tailscale": {
         "url": os.environ.get("MCP_TAILSCALE_URL", "https://tailscale-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
         "prefix": "ts",
-        "description": "Tailscale network management (devices, routes, ACL, auth keys)",
+        "description": "Tailscale network management",
         "enabled": True,
-        "transport": "json"
+        "transport": "json",
+        "priority": 2,
+        "health_check": True
     },
-    "asana": {
-        "url": os.environ.get("MCP_ASANA_URL", "https://asana-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
-        "prefix": "asana",
-        "description": "Asana project management (tasks, projects, sections, comments)",
+    "mac_studio": {
+        "url": os.environ.get("MCP_MACSTUDIO_URL", "https://mac-studio-mcp.tail96c90.ts.net/mcp"),
+        "prefix": "mac",
+        "description": "Mac Studio via Tailscale Funnel",
         "enabled": True,
-        "transport": "json"
-    },
-    "m365": {
-        "url": os.environ.get("MCP_M365_URL", "https://m365-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
-        "prefix": "m365",
-        "description": "Microsoft 365 email, calendar, users (ABBI mailbox)",
-        "enabled": True,
-        "transport": "json"
+        "transport": "json",
+        "priority": 2,
+        "health_check": True,
+        "alt_url": "http://100.70.153.106:8080/mcp"
     }
 }
 
-# =============================================================================
-# TOOL CATALOG CACHE
-# =============================================================================
-
-def parse_sse_response(text):
+def parse_sse_response(text: str) -> Optional[Dict]:
     for line in text.split('\n'):
         if line.startswith('data: '):
             try:
@@ -160,85 +199,152 @@ def parse_sse_response(text):
 
 class ToolCatalog:
     def __init__(self):
-        self.tools = {}
-        self.last_refresh = None
+        self.tools: Dict[str, Dict] = {}
+        self.backend_health: Dict[str, Dict] = {}
+        self.last_refresh: Optional[datetime] = None
         self.refresh_interval = 300
     
-    def needs_refresh(self):
+    def needs_refresh(self) -> bool:
         if self.last_refresh is None:
             return True
         return (datetime.now() - self.last_refresh).seconds > self.refresh_interval
     
+    async def check_backend_health(self, client: httpx.AsyncClient, name: str, config: Dict) -> bool:
+        if not config.get("health_check", True):
+            return True
+        try:
+            response = await client.get(config["url"].replace("/mcp", "/"), timeout=10.0)
+            return response.status_code == 200
+        except Exception:
+            if config.get("alt_url"):
+                try:
+                    response = await client.get(config["alt_url"].replace("/mcp", "/"), timeout=10.0)
+                    return response.status_code == 200
+                except Exception:
+                    pass
+            return False
+    
     async def refresh(self):
         logger.info("Refreshing tool catalog from backend MCPs...")
         new_tools = {}
-        
+        health_status = {}
+        sorted_backends = sorted(
+            [(k, v) for k, v in BACKEND_MCPS.items() if v.get("enabled", False)],
+            key=lambda x: x[1].get("priority", 99)
+        )
         async with httpx.AsyncClient(timeout=30.0, verify=False) as client:
-            for backend_name, config in BACKEND_MCPS.items():
-                if not config.get("enabled", False):
-                    continue
-                
+            for backend_name, config in sorted_backends:
+                health_status[backend_name] = {"status": "unknown", "tools": 0, "error": None}
                 try:
+                    is_healthy = await self.check_backend_health(client, backend_name, config)
+                    if not is_healthy:
+                        health_status[backend_name] = {"status": "unhealthy", "tools": 0, "error": "Health check failed"}
+                        logger.warning(f"  {backend_name}: Health check failed, skipping")
+                        continue
                     headers = {"Content-Type": "application/json"}
                     if config.get("headers"):
                         headers.update(config["headers"])
-                    
+                    timeout = config.get("timeout", 30.0)
+                    url = config["url"]
                     response = await client.post(
-                        config["url"],
+                        url,
                         json={"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}},
-                        headers=headers
+                        headers=headers,
+                        timeout=timeout
                     )
-                    
                     if response.status_code == 200:
                         if config.get("transport") == "sse":
                             data = parse_sse_response(response.text)
                         else:
                             data = response.json()
-                        
                         if not data:
-                            logger.warning(f"  FAIL {backend_name}: Could not parse response")
+                            health_status[backend_name] = {"status": "error", "tools": 0, "error": "Could not parse response"}
                             continue
-                            
                         tools = data.get("result", {}).get("tools", [])
                         prefix = config["prefix"]
-                        
                         for tool in tools:
                             original_name = tool["name"]
                             prefixed_name = f"{prefix}_{original_name}"
                             new_tools[prefixed_name] = {
                                 "backend": backend_name,
-                                "backend_url": config["url"],
+                                "backend_url": url,
                                 "original_name": original_name,
                                 "transport": config.get("transport", "json"),
                                 "headers": config.get("headers", {}),
+                                "timeout": config.get("timeout", 60.0),
                                 "schema": {
                                     "name": prefixed_name,
                                     "description": f"[{prefix.upper()}] {tool.get('description', '')}",
                                     "inputSchema": tool.get("inputSchema", {})
                                 }
                             }
+                        health_status[backend_name] = {"status": "healthy", "tools": len(tools), "error": None}
                         logger.info(f"  OK {backend_name}: {len(tools)} tools loaded")
                     else:
-                        logger.warning(f"  FAIL {backend_name}: HTTP {response.status_code}")
+                        health_status[backend_name] = {"status": "error", "tools": 0, "error": f"HTTP {response.status_code}"}
+                except httpx.TimeoutException:
+                    health_status[backend_name] = {"status": "timeout", "tools": 0, "error": "Connection timeout"}
                 except Exception as e:
-                    logger.warning(f"  FAIL {backend_name}: {str(e)}")
-        
+                    health_status[backend_name] = {"status": "error", "tools": 0, "error": str(e)[:100]}
         self.tools = new_tools
+        self.backend_health = health_status
         self.last_refresh = datetime.now()
-        logger.info(f"Tool catalog refreshed: {len(self.tools)} total tools")
+        healthy_count = sum(1 for h in health_status.values() if h["status"] == "healthy")
+        logger.info(f"Tool catalog refreshed: {len(self.tools)} tools from {healthy_count}/{len(sorted_backends)} backends")
     
     def get_all_tools(self):
         return [t["schema"] for t in self.tools.values()]
     
-    def get_tool(self, prefixed_name):
+    def get_tool(self, prefixed_name: str) -> Optional[Dict]:
         return self.tools.get(prefixed_name)
+    
+    def get_health_report(self) -> Dict:
+        return {
+            "last_refresh": self.last_refresh.isoformat() if self.last_refresh else None,
+            "total_tools": len(self.tools),
+            "backends": self.backend_health
+        }
 
 catalog = ToolCatalog()
-sse_sessions = {}
+sse_sessions: Dict[str, queue.Queue] = {}
 
-# =============================================================================
-# MCP PROTOCOL HANDLERS
-# =============================================================================
+NATIVE_TOOLS = [
+    {
+        "name": "hivemind_write",
+        "description": "[GATEWAY] Write an entry to the Sovereign Mind Hive Mind shared memory",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "source": {"type": "string", "description": "Source identifier"},
+                "category": {"type": "string", "description": "Category: CONTEXT, DECISION, ACTION_ITEM, etc"},
+                "workstream": {"type": "string", "description": "Workstream or project name", "default": "GENERAL"},
+                "summary": {"type": "string", "description": "Clear summary", "maxLength": 2000},
+                "details": {"type": "object", "description": "JSON details object"},
+                "priority": {"type": "string", "enum": ["HIGH", "MEDIUM", "LOW"], "default": "MEDIUM"},
+                "tags": {"type": "array", "items": {"type": "string"}}
+            },
+            "required": ["source", "category", "summary"]
+        }
+    },
+    {
+        "name": "hivemind_read",
+        "description": "[GATEWAY] Read recent entries from the Sovereign Mind Hive Mind",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "limit": {"type": "integer", "default": 10, "maximum": 50},
+                "category": {"type": "string"},
+                "source": {"type": "string"},
+                "workstream": {"type": "string"}
+            }
+        }
+    },
+    {
+        "name": "gateway_status",
+        "description": "[GATEWAY] Get the status of all MCP backends and health information",
+        "inputSchema": {"type": "object", "properties": {}}
+    }
+]
 
 def run_async(coro):
     loop = asyncio.new_event_loop()
@@ -248,50 +354,75 @@ def run_async(coro):
     finally:
         loop.close()
 
-async def call_backend_tool(backend_url: str, tool_name: str, arguments: dict, transport: str = "json", extra_headers: dict = None):
+async def call_backend_tool(backend_url: str, tool_name: str, arguments: dict, transport: str = "json", extra_headers: dict = None, timeout: float = 60.0):
     headers = {"Content-Type": "application/json"}
     if extra_headers:
         headers.update(extra_headers)
-    
-    async with httpx.AsyncClient(timeout=60.0, verify=False) as client:
+    async with httpx.AsyncClient(timeout=timeout, verify=False) as client:
         response = await client.post(
             backend_url,
             json={"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": tool_name, "arguments": arguments}},
             headers=headers
         )
-        
         if transport == "sse":
             return parse_sse_response(response.text)
         return response.json()
 
-def handle_initialize(params):
-    return {
-        "protocolVersion": "2024-11-05",
-        "capabilities": {"tools": {"listChanged": True}},
-        "serverInfo": {"name": "sovereign-mind-gateway", "version": "1.7.0"}
-    }
+def handle_native_tool(tool_name: str, arguments: dict) -> Dict:
+    if tool_name == "gateway_status":
+        return {"content": [{"type": "text", "text": json.dumps({"gateway": "sovereign_mind_gateway", "version": "2.0.0", "timestamp": datetime.now().isoformat(), "health": catalog.get_health_report(), "backends_configured": list(BACKEND_MCPS.keys())}, indent=2)}]}
+    elif tool_name == "hivemind_write":
+        tool_info = catalog.get_tool("sm_query_snowflake")
+        if not tool_info:
+            return {"content": [{"type": "text", "text": "Error: Snowflake backend not available"}], "isError": True}
+        tags_json = json.dumps(arguments.get("tags", [])) if arguments.get("tags") else "NULL"
+        details_json = json.dumps(arguments.get("details", {})) if arguments.get("details") else "NULL"
+        sql = f"INSERT INTO SOVEREIGN_MIND.RAW.HIVE_MIND (SOURCE, CATEGORY, WORKSTREAM, SUMMARY, DETAILS, PRIORITY, STATUS, TAGS) VALUES ('{arguments.get('source', 'GATEWAY')}', '{arguments.get('category', 'CONTEXT')}', '{arguments.get('workstream', 'GENERAL')}', '{arguments.get('summary', '').replace(chr(39), chr(39)+chr(39))}', PARSE_JSON('{details_json.replace(chr(39), chr(39)+chr(39))}'), '{arguments.get('priority', 'MEDIUM')}', 'ACTIVE', PARSE_JSON('{tags_json}'))"
+        try:
+            run_async(call_backend_tool(tool_info["backend_url"], tool_info["original_name"], {"sql": sql}, tool_info.get("transport", "json")))
+            return {"content": [{"type": "text", "text": "Hive Mind entry created successfully"}]}
+        except Exception as e:
+            return {"content": [{"type": "text", "text": f"Error writing to Hive Mind: {str(e)}"}], "isError": True}
+    elif tool_name == "hivemind_read":
+        tool_info = catalog.get_tool("sm_query_snowflake")
+        if not tool_info:
+            return {"content": [{"type": "text", "text": "Error: Snowflake backend not available"}], "isError": True}
+        limit = arguments.get("limit", 10)
+        conditions = []
+        if arguments.get("category"):
+            conditions.append(f"CATEGORY = '{arguments['category']}'")
+        if arguments.get("source"):
+            conditions.append(f"SOURCE = '{arguments['source']}'")
+        if arguments.get("workstream"):
+            conditions.append(f"WORKSTREAM = '{arguments['workstream']}'")
+        where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+        sql = f"SELECT ID, CREATED_AT, SOURCE, CATEGORY, WORKSTREAM, SUMMARY, PRIORITY, STATUS FROM SOVEREIGN_MIND.RAW.HIVE_MIND {where_clause} ORDER BY CREATED_AT DESC LIMIT {limit}"
+        try:
+            result = run_async(call_backend_tool(tool_info["backend_url"], tool_info["original_name"], {"sql": sql}, tool_info.get("transport", "json")))
+            return result.get("result", result)
+        except Exception as e:
+            return {"content": [{"type": "text", "text": f"Error reading Hive Mind: {str(e)}"}], "isError": True}
+    return {"content": [{"type": "text", "text": f"Unknown native tool: {tool_name}"}], "isError": True}
 
-def handle_tools_list(params):
+def handle_initialize(params: dict) -> Dict:
+    return {"protocolVersion": "2024-11-05", "capabilities": {"tools": {"listChanged": True}}, "serverInfo": {"name": "sovereign-mind-gateway", "version": "2.0.0"}}
+
+def handle_tools_list(params: dict) -> Dict:
     if catalog.needs_refresh():
         run_async(catalog.refresh())
-    return {"tools": catalog.get_all_tools()}
+    return {"tools": catalog.get_all_tools() + NATIVE_TOOLS}
 
-def handle_tools_call(params):
+def handle_tools_call(params: dict) -> Dict:
     tool_name = params.get("name", "")
     arguments = params.get("arguments", {})
-    
+    native_names = [t["name"] for t in NATIVE_TOOLS]
+    if tool_name in native_names:
+        return handle_native_tool(tool_name, arguments)
     tool_info = catalog.get_tool(tool_name)
     if not tool_info:
         return {"content": [{"type": "text", "text": f"Error: Unknown tool '{tool_name}'"}], "isError": True}
-    
     try:
-        result = run_async(call_backend_tool(
-            tool_info["backend_url"], 
-            tool_info["original_name"], 
-            arguments,
-            tool_info.get("transport", "json"),
-            tool_info.get("headers", {})
-        ))
+        result = run_async(call_backend_tool(tool_info["backend_url"], tool_info["original_name"], arguments, tool_info.get("transport", "json"), tool_info.get("headers", {}), tool_info.get("timeout", 60.0)))
         if result and "result" in result:
             return result["result"]
         elif result and "error" in result:
@@ -299,43 +430,25 @@ def handle_tools_call(params):
         else:
             return result if result else {"content": [{"type": "text", "text": "No response from backend"}], "isError": True}
     except Exception as e:
-        logger.error(f"Error calling backend tool: {e}")
+        logger.error(f"Error calling backend tool {tool_name}: {e}")
         return {"content": [{"type": "text", "text": f"Error calling tool: {str(e)}"}], "isError": True}
 
-def process_mcp_message(data):
+def process_mcp_message(data: dict) -> Dict:
     method = data.get("method", "")
     params = data.get("params", {})
     request_id = data.get("id", 1)
-    
     logger.info(f"MCP request: {method}")
-    
-    if method == "initialize":
-        result = handle_initialize(params)
-    elif method == "tools/list":
-        result = handle_tools_list(params)
-    elif method == "tools/call":
-        result = handle_tools_call(params)
-    elif method == "notifications/initialized":
-        return {"jsonrpc": "2.0", "id": request_id, "result": {}}
+    handlers = {"initialize": handle_initialize, "tools/list": handle_tools_list, "tools/call": handle_tools_call, "notifications/initialized": lambda p: {}}
+    handler = handlers.get(method)
+    if handler:
+        result = handler(params)
     else:
         return {"jsonrpc": "2.0", "id": request_id, "error": {"code": -32601, "message": f"Method not found: {method}"}}
-    
     return {"jsonrpc": "2.0", "id": request_id, "result": result}
-
-# =============================================================================
-# FLASK ROUTES
-# =============================================================================
 
 @app.route("/", methods=["GET"])
 def health_check():
-    return jsonify({
-        "status": "healthy",
-        "service": "sovereign-mind-gateway",
-        "version": "1.7.0",
-        "features": ["mcp-proxy", "sse-transport", "web-scrapers", "make-sse-support", "tailscale", "asana", "m365"],
-        "backends": list(BACKEND_MCPS.keys()),
-        "total_tools": len(catalog.tools) if catalog.tools else "not yet loaded"
-    })
+    return jsonify({"status": "healthy", "service": "sovereign-mind-gateway", "version": "2.0.0", "features": ["mcp-proxy", "sse-transport", "health-monitoring", "native-hivemind", "graceful-fallback"], "backends": list(BACKEND_MCPS.keys()), "total_tools": len(catalog.tools) + len(NATIVE_TOOLS) if catalog.tools else "not yet loaded"})
 
 @app.route("/mcp", methods=["POST"])
 def mcp_handler():
@@ -354,16 +467,14 @@ def sse_connect():
     session_id = str(uuid.uuid4())
     sse_sessions[session_id] = queue.Queue()
     logger.info(f"SSE connection established: {session_id}")
-    
     def generate():
         yield f"event: endpoint\ndata: /sse/{session_id}/message\n\n"
         while True:
             try:
-                try:
-                    message = sse_sessions[session_id].get(timeout=30)
-                    yield f"event: message\ndata: {json.dumps(message)}\n\n"
-                except queue.Empty:
-                    yield ": keepalive\n\n"
+                message = sse_sessions[session_id].get(timeout=30)
+                yield f"event: message\ndata: {json.dumps(message)}\n\n"
+            except queue.Empty:
+                yield ": keepalive\n\n"
             except GeneratorExit:
                 break
             except Exception as e:
@@ -372,9 +483,7 @@ def sse_connect():
         if session_id in sse_sessions:
             del sse_sessions[session_id]
         logger.info(f"SSE connection closed: {session_id}")
-    
-    return Response(generate(), mimetype="text/event-stream",
-                   headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"})
+    return Response(generate(), mimetype="text/event-stream", headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"})
 
 @app.route("/sse/<session_id>/message", methods=["POST"])
 def sse_message(session_id):
@@ -394,138 +503,28 @@ def sse_message(session_id):
 @app.route("/refresh", methods=["POST"])
 def force_refresh():
     run_async(catalog.refresh())
-    return jsonify({
-        "status": "refreshed",
-        "total_tools": len(catalog.tools),
-        "timestamp": catalog.last_refresh.isoformat() if catalog.last_refresh else None
-    })
+    return jsonify({"status": "refreshed", "total_tools": len(catalog.tools) + len(NATIVE_TOOLS), "timestamp": catalog.last_refresh.isoformat() if catalog.last_refresh else None, "health": catalog.get_health_report()})
 
 @app.route("/tools", methods=["GET"])
 def list_tools():
     if catalog.needs_refresh():
         run_async(catalog.refresh())
-    tools_by_backend = {}
+    tools_by_backend = {"_native": []}
+    for tool in NATIVE_TOOLS:
+        tools_by_backend["_native"].append({"name": tool["name"], "description": tool.get("description", "")})
     for name, info in catalog.tools.items():
         backend = info["backend"]
         if backend not in tools_by_backend:
             tools_by_backend[backend] = []
-        tools_by_backend[backend].append({
-            "prefixed_name": name,
-            "original_name": info["original_name"],
-            "description": info["schema"].get("description", "")
-        })
-    return jsonify({"total_tools": len(catalog.tools), "backends": tools_by_backend})
+        tools_by_backend[backend].append({"prefixed_name": name, "original_name": info["original_name"], "description": info["schema"].get("description", "")})
+    return jsonify({"total_tools": len(catalog.tools) + len(NATIVE_TOOLS), "backends": tools_by_backend, "health": catalog.get_health_report()})
 
-# =============================================================================
-# SCRAPER ENDPOINTS
-# =============================================================================
-
-@app.route("/scrapers/gfdata/run", methods=["POST"])
-def run_gfdata_scraper():
-    profile = request.json.get("profile", "mgc_core") if request.json else "mgc_core"
-    valid_profiles = ["mgc_core", "distribution_only", "manufacturing_only", "full_lower_middle_market"]
-    
-    if profile not in valid_profiles:
-        return jsonify({"error": f"Invalid profile. Must be one of: {valid_profiles}"}), 400
-    
-    logger.info(f"Starting GF Data scraper with profile: {profile}")
-    
-    try:
-        bot_path = "/app/scrapers/gfdata/gfdata_bot.py"
-        
-        if not os.path.exists(bot_path):
-            return jsonify({
-                "error": "Scraper not found",
-                "path": bot_path,
-                "hint": "Container needs rebuild with scrapers directory"
-            }), 404
-        
-        result = subprocess.run(
-            [sys.executable, bot_path, "--profile", profile],
-            capture_output=True,
-            text=True,
-            timeout=600,
-            env={**os.environ}
-        )
-        
-        return jsonify({
-            "status": "completed" if result.returncode == 0 else "failed",
-            "profile": profile,
-            "returncode": result.returncode,
-            "stdout": result.stdout[-5000:] if result.stdout else None,
-            "stderr": result.stderr[-2000:] if result.stderr else None
-        })
-        
-    except subprocess.TimeoutExpired:
-        return jsonify({"status": "timeout", "error": "Scraper exceeded 10 minute timeout"}), 504
-    except Exception as e:
-        logger.error(f"Scraper error: {e}")
-        return jsonify({"status": "error", "error": str(e)}), 500
-
-@app.route("/scrapers/gfdata/status", methods=["GET"])
-def gfdata_status():
-    import snowflake.connector
-    
-    try:
-        conn = snowflake.connector.connect(
-            user=os.environ.get('SNOWFLAKE_USER', 'JOHN_CLAUDE'),
-            password=os.environ.get('SNOWFLAKE_PASSWORD'),
-            account=os.environ.get('SNOWFLAKE_ACCOUNT'),
-            warehouse=os.environ.get('SNOWFLAKE_WAREHOUSE', 'SOVEREIGN_MIND_WH'),
-            database='HURRICANE',
-            schema='MARKET_INTEL'
-        )
-        
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            SELECT job_id, source_name, status, records_scraped, records_loaded, 
-                   error_message, started_at, completed_at
-            FROM SCRAPE_JOBS 
-            WHERE source_name = 'GF Data'
-            ORDER BY started_at DESC LIMIT 5
-        """)
-        jobs = cursor.fetchall()
-        
-        try:
-            cursor.execute("SELECT COUNT(*) FROM GFDATA_RAW")
-            record_count = cursor.fetchone()[0]
-        except:
-            record_count = 0
-        
-        cursor.close()
-        conn.close()
-        
-        return jsonify({
-            "scraper": "gfdata",
-            "bot_path": "/app/scrapers/gfdata/gfdata_bot.py",
-            "bot_exists": os.path.exists("/app/scrapers/gfdata/gfdata_bot.py"),
-            "total_records": record_count,
-            "recent_jobs": [
-                {
-                    "job_id": str(j[0]),
-                    "source": j[1],
-                    "status": j[2],
-                    "records_scraped": j[3],
-                    "records_loaded": j[4],
-                    "error": j[5],
-                    "started_at": j[6].isoformat() if j[6] else None,
-                    "completed_at": j[7].isoformat() if j[7] else None
-                }
-                for j in jobs
-            ] if jobs else []
-        })
-        
-    except Exception as e:
-        logger.error(f"Status check error: {e}")
-        return jsonify({"error": str(e)}), 500
-
-# =============================================================================
-# MAIN
-# =============================================================================
+@app.route("/health", methods=["GET"])
+def detailed_health():
+    return jsonify(catalog.get_health_report())
 
 if __name__ == "__main__":
-    logger.info("Sovereign Mind MCP Gateway v1.7.0 starting...")
+    logger.info("Sovereign Mind MCP Gateway v2.0.0 starting...")
     run_async(catalog.refresh())
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
