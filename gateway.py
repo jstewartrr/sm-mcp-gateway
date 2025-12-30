@@ -1801,16 +1801,17 @@ async def drive_move_file(params: DriveMoveFileInput) -> str:
 # MAIN ENTRY POINT
 # ============================================================================
 
+
 if __name__ == "__main__":
     import sys
     
     # Support both stdio and HTTP transports
     transport = os.getenv("MCP_TRANSPORT", "streamable_http")
-    port = int(os.getenv("PORT", "8000"))
+    port = int(os.getenv("PORT", "8080"))
     
     if transport == "stdio":
         mcp.run()
     else:
-        # For HTTP transport, use uvicorn directly with the ASGI app
-        # Use FastMCP run with HTTP transport
-        mcp.run(transport="streamable-http", host="0.0.0.0", port=port)
+        # For HTTP transport, get the Starlette app and run with uvicorn
+        app = mcp.streamable_http_app()
+        uvicorn.run(app, host="0.0.0.0", port=port)
