@@ -175,7 +175,7 @@ async def m365_graph_request(
 # ============================================================================
 
 @asynccontextmanager
-async def gateway_lifespan():
+async def gateway_lifespan(app):
     """Initialize shared resources for the gateway."""
     # Initialize Snowflake connection
     snowflake_conn = None
