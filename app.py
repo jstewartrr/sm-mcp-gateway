@@ -1,8 +1,8 @@
 """
-Sovereign Mind MCP Gateway v1.5.0
+Sovereign Mind MCP Gateway v1.6.0
 =================================
 A unified MCP server with integrated web scraper support.
-Added: Tailscale MCP backend for network management
+Added: Asana MCP backend for project management
 """
 
 import os
@@ -128,6 +128,13 @@ BACKEND_MCPS = {
         "description": "Tailscale network management (devices, routes, ACL, auth keys)",
         "enabled": True,
         "transport": "json"
+    },
+    "asana": {
+        "url": os.environ.get("MCP_ASANA_URL", "https://asana-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
+        "prefix": "asana",
+        "description": "Asana project management (tasks, projects, sections, comments)",
+        "enabled": True,
+        "transport": "json"
     }
 }
 
@@ -136,7 +143,6 @@ BACKEND_MCPS = {
 # =============================================================================
 
 def parse_sse_response(text):
-    """Parse SSE response format: event: message\ndata: {...}"""
     for line in text.split('\n'):
         if line.startswith('data: '):
             try:
@@ -177,7 +183,6 @@ class ToolCatalog:
                     )
                     
                     if response.status_code == 200:
-                        # Handle SSE transport (Make.com)
                         if config.get("transport") == "sse":
                             data = parse_sse_response(response.text)
                         else:
@@ -256,7 +261,7 @@ def handle_initialize(params):
     return {
         "protocolVersion": "2024-11-05",
         "capabilities": {"tools": {"listChanged": True}},
-        "serverInfo": {"name": "sovereign-mind-gateway", "version": "1.5.0"}
+        "serverInfo": {"name": "sovereign-mind-gateway", "version": "1.6.0"}
     }
 
 def handle_tools_list(params):
@@ -319,8 +324,8 @@ def health_check():
     return jsonify({
         "status": "healthy",
         "service": "sovereign-mind-gateway",
-        "version": "1.5.0",
-        "features": ["mcp-proxy", "sse-transport", "web-scrapers", "make-sse-support", "tailscale"],
+        "version": "1.6.0",
+        "features": ["mcp-proxy", "sse-transport", "web-scrapers", "make-sse-support", "tailscale", "asana"],
         "backends": list(BACKEND_MCPS.keys()),
         "total_tools": len(catalog.tools) if catalog.tools else "not yet loaded"
     })
@@ -513,7 +518,7 @@ def gfdata_status():
 # =============================================================================
 
 if __name__ == "__main__":
-    logger.info("Sovereign Mind MCP Gateway v1.5.0 starting...")
+    logger.info("Sovereign Mind MCP Gateway v1.6.0 starting...")
     run_async(catalog.refresh())
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
