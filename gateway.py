@@ -1,9 +1,10 @@
 """
-Sovereign Mind MCP Gateway v1.7.0
+Sovereign Mind MCP Gateway v1.8.0
 ==========================
 Unified MCP server that aggregates tools from multiple backend services.
 Provides single connection point for Claude.ai, ElevenLabs ABBI, and future agents.
 
+v1.8.0 - Added Google Drive tools (list, search, read, upload, move)
 v1.7.0 - Added M365 Email/Calendar integration
 """
 
@@ -1476,6 +1477,325 @@ async def mac_health(params: MacHealthInput) -> str:
         timeout=10.0
     )
     return json.dumps(result, indent=2)
+
+# ============================================================================
+# GOOGLE DRIVE TOOLS
+# ============================================================================
+
+# Google Drive backend URL
+GOOGLE_DRIVE_MCP_URL = os.getenv("GOOGLE_DRIVE_MCP_URL", "https://google-drive-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io")
+
+class DriveListSharedDrivesInput(BaseModel):
+    """Input for listing shared drives."""
+    pass
+
+@mcp.tool(
+    name="drive_list_shared_drives",
+    annotations={
+        "title": "[DRIVE] [DRIVE] List all Shared Drives accessible to the service account",
+        "readOnlyHint": True
+    }
+)
+async def drive_list_shared_drives(params: DriveListSharedDrivesInput) -> str:
+    """List all Shared Drives accessible to the service account."""
+    result = await make_api_request(
+        method="POST",
+        url=f"{GOOGLE_DRIVE_MCP_URL}/mcp",
+        headers={"Content-Type": "application/json"},
+        json_data={"method": "tools/call", "params": {"name": "list_shared_drives", "arguments": {}}}
+    )
+    if "result" in result:
+        return json.dumps(result["result"], indent=2)
+    return json.dumps(result, indent=2)
+
+class DriveListFolderInput(BaseModel):
+    """Input for listing folder contents."""
+    folder_id: str = Field(..., description="Folder ID or Shared Drive ID")
+    page_size: int = Field(default=50)
+
+@mcp.tool(
+    name="drive_list_folder_contents",
+    annotations={
+        "title": "[DRIVE] [DRIVE] List files in a folder (works with Shared Drives)",
+        "readOnlyHint": True
+    }
+)
+async def drive_list_folder_contents(params: DriveListFolderInput) -> str:
+    """List files in a folder (works with Shared Drives)."""
+    result = await make_api_request(
+        method="POST",
+        url=f"{GOOGLE_DRIVE_MCP_URL}/mcp",
+        headers={"Content-Type": "application/json"},
+        json_data={"method": "tools/call", "params": {"name": "list_folder_contents", "arguments": {"folder_id": params.folder_id, "page_size": params.page_size}}}
+    )
+    if "result" in result:
+        return json.dumps(result["result"], indent=2)
+    return json.dumps(result, indent=2)
+
+class DriveSearchFilesInput(BaseModel):
+    """Input for searching files."""
+    query: str = Field(..., description="Search query")
+    folder_id: Optional[str] = Field(default=None)
+    file_type: Optional[str] = Field(default=None)
+
+@mcp.tool(
+    name="drive_search_files",
+    annotations={
+        "title": "[DRIVE] [DRIVE] Search files by name (includes Shared Drives)",
+        "readOnlyHint": True
+    }
+)
+async def drive_search_files(params: DriveSearchFilesInput) -> str:
+    """Search files by name (includes Shared Drives)."""
+    args = {"query": params.query}
+    if params.folder_id:
+        args["folder_id"] = params.folder_id
+    if params.file_type:
+        args["file_type"] = params.file_type
+    result = await make_api_request(
+        method="POST",
+        url=f"{GOOGLE_DRIVE_MCP_URL}/mcp",
+        headers={"Content-Type": "application/json"},
+        json_data={"method": "tools/call", "params": {"name": "search_files", "arguments": args}}
+    )
+    if "result" in result:
+        return json.dumps(result["result"], indent=2)
+    return json.dumps(result, indent=2)
+
+class DriveGetFileMetadataInput(BaseModel):
+    """Input for getting file metadata."""
+    file_id: str
+
+@mcp.tool(
+    name="drive_get_file_metadata",
+    annotations={
+        "title": "[DRIVE] [DRIVE] Get file metadata",
+        "readOnlyHint": True
+    }
+)
+async def drive_get_file_metadata(params: DriveGetFileMetadataInput) -> str:
+    """Get file metadata."""
+    result = await make_api_request(
+        method="POST",
+        url=f"{GOOGLE_DRIVE_MCP_URL}/mcp",
+        headers={"Content-Type": "application/json"},
+        json_data={"method": "tools/call", "params": {"name": "get_file_metadata", "arguments": {"file_id": params.file_id}}}
+    )
+    if "result" in result:
+        return json.dumps(result["result"], indent=2)
+    return json.dumps(result, indent=2)
+
+class DriveReadTextFileInput(BaseModel):
+    """Input for reading text files."""
+    file_id: str
+
+@mcp.tool(
+    name="drive_read_text_file",
+    annotations={
+        "title": "[DRIVE] [DRIVE] Read text files",
+        "readOnlyHint": True
+    }
+)
+async def drive_read_text_file(params: DriveReadTextFileInput) -> str:
+    """Read text files."""
+    result = await make_api_request(
+        method="POST",
+        url=f"{GOOGLE_DRIVE_MCP_URL}/mcp",
+        headers={"Content-Type": "application/json"},
+        json_data={"method": "tools/call", "params": {"name": "read_text_file", "arguments": {"file_id": params.file_id}}}
+    )
+    if "result" in result:
+        return json.dumps(result["result"], indent=2)
+    return json.dumps(result, indent=2)
+
+class DriveReadExcelFileInput(BaseModel):
+    """Input for reading Excel files."""
+    file_id: str
+    sheet_name: Optional[str] = Field(default=None)
+
+@mcp.tool(
+    name="drive_read_excel_file",
+    annotations={
+        "title": "[DRIVE] [DRIVE] Read Excel/Sheets",
+        "readOnlyHint": True
+    }
+)
+async def drive_read_excel_file(params: DriveReadExcelFileInput) -> str:
+    """Read Excel/Sheets."""
+    args = {"file_id": params.file_id}
+    if params.sheet_name:
+        args["sheet_name"] = params.sheet_name
+    result = await make_api_request(
+        method="POST",
+        url=f"{GOOGLE_DRIVE_MCP_URL}/mcp",
+        headers={"Content-Type": "application/json"},
+        json_data={"method": "tools/call", "params": {"name": "read_excel_file", "arguments": args}}
+    )
+    if "result" in result:
+        return json.dumps(result["result"], indent=2)
+    return json.dumps(result, indent=2)
+
+class DriveReadPdfFileInput(BaseModel):
+    """Input for reading PDF files."""
+    file_id: str
+    page_numbers: Optional[List[int]] = Field(default=None)
+
+@mcp.tool(
+    name="drive_read_pdf_file",
+    annotations={
+        "title": "[DRIVE] [DRIVE] Extract PDF text",
+        "readOnlyHint": True
+    }
+)
+async def drive_read_pdf_file(params: DriveReadPdfFileInput) -> str:
+    """Extract PDF text."""
+    args = {"file_id": params.file_id}
+    if params.page_numbers:
+        args["page_numbers"] = params.page_numbers
+    result = await make_api_request(
+        method="POST",
+        url=f"{GOOGLE_DRIVE_MCP_URL}/mcp",
+        headers={"Content-Type": "application/json"},
+        json_data={"method": "tools/call", "params": {"name": "read_pdf_file", "arguments": args}}
+    )
+    if "result" in result:
+        return json.dumps(result["result"], indent=2)
+    return json.dumps(result, indent=2)
+
+class DriveReadWordFileInput(BaseModel):
+    """Input for reading Word files."""
+    file_id: str
+
+@mcp.tool(
+    name="drive_read_word_file",
+    annotations={
+        "title": "[DRIVE] [DRIVE] Extract Word text",
+        "readOnlyHint": True
+    }
+)
+async def drive_read_word_file(params: DriveReadWordFileInput) -> str:
+    """Extract Word text."""
+    result = await make_api_request(
+        method="POST",
+        url=f"{GOOGLE_DRIVE_MCP_URL}/mcp",
+        headers={"Content-Type": "application/json"},
+        json_data={"method": "tools/call", "params": {"name": "read_word_file", "arguments": {"file_id": params.file_id}}}
+    )
+    if "result" in result:
+        return json.dumps(result["result"], indent=2)
+    return json.dumps(result, indent=2)
+
+class DriveReadPowerpointFileInput(BaseModel):
+    """Input for reading PowerPoint files."""
+    file_id: str
+
+@mcp.tool(
+    name="drive_read_powerpoint_file",
+    annotations={
+        "title": "[DRIVE] [DRIVE] Extract PowerPoint text",
+        "readOnlyHint": True
+    }
+)
+async def drive_read_powerpoint_file(params: DriveReadPowerpointFileInput) -> str:
+    """Extract PowerPoint text."""
+    result = await make_api_request(
+        method="POST",
+        url=f"{GOOGLE_DRIVE_MCP_URL}/mcp",
+        headers={"Content-Type": "application/json"},
+        json_data={"method": "tools/call", "params": {"name": "read_powerpoint_file", "arguments": {"file_id": params.file_id}}}
+    )
+    if "result" in result:
+        return json.dumps(result["result"], indent=2)
+    return json.dumps(result, indent=2)
+
+class DriveCreateFolderInput(BaseModel):
+    """Input for creating folders."""
+    name: str = Field(..., description="Folder name")
+    parent_folder_id: Optional[str] = Field(default=None, description="Parent folder ID")
+    shared_drive_id: Optional[str] = Field(default=None, description="Shared Drive ID")
+
+@mcp.tool(
+    name="drive_create_folder",
+    annotations={
+        "title": "[DRIVE] Create a folder in Google Drive",
+        "readOnlyHint": False
+    }
+)
+async def drive_create_folder(params: DriveCreateFolderInput) -> str:
+    """Create a folder in Google Drive."""
+    args = {"name": params.name}
+    if params.parent_folder_id:
+        args["parent_folder_id"] = params.parent_folder_id
+    if params.shared_drive_id:
+        args["shared_drive_id"] = params.shared_drive_id
+    result = await make_api_request(
+        method="POST",
+        url=f"{GOOGLE_DRIVE_MCP_URL}/mcp",
+        headers={"Content-Type": "application/json"},
+        json_data={"method": "tools/call", "params": {"name": "create_folder", "arguments": args}}
+    )
+    if "result" in result:
+        return json.dumps(result["result"], indent=2)
+    return json.dumps(result, indent=2)
+
+class DriveUploadFileInput(BaseModel):
+    """Input for uploading files."""
+    name: str = Field(..., description="File name")
+    content_base64: str = Field(..., description="Base64-encoded file content")
+    parent_folder_id: str = Field(..., description="Parent folder ID")
+    mime_type: Optional[str] = Field(default=None, description="MIME type")
+
+@mcp.tool(
+    name="drive_upload_file",
+    annotations={
+        "title": "[DRIVE] Upload a file to Google Drive",
+        "readOnlyHint": False
+    }
+)
+async def drive_upload_file(params: DriveUploadFileInput) -> str:
+    """Upload a file to Google Drive."""
+    args = {
+        "name": params.name,
+        "content_base64": params.content_base64,
+        "parent_folder_id": params.parent_folder_id
+    }
+    if params.mime_type:
+        args["mime_type"] = params.mime_type
+    result = await make_api_request(
+        method="POST",
+        url=f"{GOOGLE_DRIVE_MCP_URL}/mcp",
+        headers={"Content-Type": "application/json"},
+        json_data={"method": "tools/call", "params": {"name": "upload_file", "arguments": args}},
+        timeout=120.0  # Longer timeout for uploads
+    )
+    if "result" in result:
+        return json.dumps(result["result"], indent=2)
+    return json.dumps(result, indent=2)
+
+class DriveMoveFileInput(BaseModel):
+    """Input for moving files."""
+    file_id: str = Field(..., description="File ID to move")
+    new_parent_id: str = Field(..., description="New parent folder ID")
+
+@mcp.tool(
+    name="drive_move_file",
+    annotations={
+        "title": "[DRIVE] Move a file to a different folder",
+        "readOnlyHint": False
+    }
+)
+async def drive_move_file(params: DriveMoveFileInput) -> str:
+    """Move a file to a different folder."""
+    result = await make_api_request(
+        method="POST",
+        url=f"{GOOGLE_DRIVE_MCP_URL}/mcp",
+        headers={"Content-Type": "application/json"},
+        json_data={"method": "tools/call", "params": {"name": "move_file", "arguments": {"file_id": params.file_id, "new_parent_id": params.new_parent_id}}}
+    )
+    if "result" in result:
+        return json.dumps(result["result"], indent=2)
+    return json.dumps(result, indent=2)
+
 
 # ============================================================================
 # MAIN ENTRY POINT
