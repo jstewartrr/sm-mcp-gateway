@@ -1812,5 +1812,5 @@ if __name__ == "__main__":
         mcp.run()
     else:
         # For HTTP transport, use uvicorn directly with the ASGI app
-        app = mcp.get_app(transport="streamable-http")
-        uvicorn.run(app, host="0.0.0.0", port=port)
+        # Use FastMCP run with HTTP transport
+        mcp.run(transport="streamable-http", host="0.0.0.0", port=port)
