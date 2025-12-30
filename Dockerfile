@@ -2,7 +2,7 @@ FROM python:3.11-slim-bookworm
 
 WORKDIR /app
 
-# Install system dependencies for Playwright
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     wget \
     gnupg \
@@ -31,12 +31,15 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Install Playwright and chromium browser
 RUN playwright install chromium && playwright install-deps chromium
 
-# Copy application and scrapers
-COPY app.py .
+# Copy unified gateway (NOT proxy app.py)
+COPY gateway.py .
+COPY gateway_sse.py .
 COPY scrapers/ ./scrapers/
 
 # Expose port
 EXPOSE 8080
 
-# Run with gunicorn for production (increased timeout for scrapers)
-CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "2", "--threads", "4", "--timeout", "600", "app:app"]
+# Run unified gateway with uvicorn (FastMCP uses ASGI)
+ENV PORT=8080
+ENV MCP_TRANSPORT=streamable_http
+CMD ["python", "gateway.py"]
