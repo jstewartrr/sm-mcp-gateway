@@ -1806,7 +1806,7 @@ if __name__ == "__main__":
     import sys
     
     # Support both stdio and HTTP transports
-    transport = os.getenv("MCP_TRANSPORT", "sse")
+    transport = os.getenv("MCP_TRANSPORT", "streamable-http")
     port = int(os.getenv("PORT", "8080"))
     
     if transport == "stdio":
@@ -1814,5 +1814,9 @@ if __name__ == "__main__":
     else:
         # For HTTP/SSE transport, get the Starlette app and run with uvicorn
         # SSE transport is compatible with Claude.ai's MCP client
-        app = mcp.sse_app()
+        # SSE or Streamable HTTP
+        if transport == "sse":
+            app = mcp.sse_app()
+        else:
+            app = mcp.streamable_http_app()
         uvicorn.run(app, host="0.0.0.0", port=port)
