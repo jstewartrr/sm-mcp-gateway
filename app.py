@@ -1,8 +1,8 @@
 """
-Sovereign Mind MCP Gateway v1.6.0
+Sovereign Mind MCP Gateway v1.7.0
 =================================
 A unified MCP server with integrated web scraper support.
-Added: Asana MCP backend for project management
+Added: Microsoft 365 MCP backend for email, calendar, users
 """
 
 import os
@@ -135,6 +135,13 @@ BACKEND_MCPS = {
         "description": "Asana project management (tasks, projects, sections, comments)",
         "enabled": True,
         "transport": "json"
+    },
+    "m365": {
+        "url": os.environ.get("MCP_M365_URL", "https://m365-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
+        "prefix": "m365",
+        "description": "Microsoft 365 email, calendar, users (ABBI mailbox)",
+        "enabled": True,
+        "transport": "json"
     }
 }
 
@@ -261,7 +268,7 @@ def handle_initialize(params):
     return {
         "protocolVersion": "2024-11-05",
         "capabilities": {"tools": {"listChanged": True}},
-        "serverInfo": {"name": "sovereign-mind-gateway", "version": "1.6.0"}
+        "serverInfo": {"name": "sovereign-mind-gateway", "version": "1.7.0"}
     }
 
 def handle_tools_list(params):
@@ -324,8 +331,8 @@ def health_check():
     return jsonify({
         "status": "healthy",
         "service": "sovereign-mind-gateway",
-        "version": "1.6.0",
-        "features": ["mcp-proxy", "sse-transport", "web-scrapers", "make-sse-support", "tailscale", "asana"],
+        "version": "1.7.0",
+        "features": ["mcp-proxy", "sse-transport", "web-scrapers", "make-sse-support", "tailscale", "asana", "m365"],
         "backends": list(BACKEND_MCPS.keys()),
         "total_tools": len(catalog.tools) if catalog.tools else "not yet loaded"
     })
@@ -518,7 +525,7 @@ def gfdata_status():
 # =============================================================================
 
 if __name__ == "__main__":
-    logger.info("Sovereign Mind MCP Gateway v1.6.0 starting...")
+    logger.info("Sovereign Mind MCP Gateway v1.7.0 starting...")
     run_async(catalog.refresh())
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
