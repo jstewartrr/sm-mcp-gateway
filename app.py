@@ -1,8 +1,8 @@
 """
-Sovereign Mind MCP Gateway v1.4.1
+Sovereign Mind MCP Gateway v1.5.0
 =================================
 A unified MCP server with integrated web scraper support.
-Added: Make.com MCP backend with proper zone and SSE handling
+Added: Tailscale MCP backend for network management
 """
 
 import os
@@ -121,6 +121,13 @@ BACKEND_MCPS = {
         "headers": {
             "Accept": "application/json, text/event-stream"
         }
+    },
+    "tailscale": {
+        "url": os.environ.get("MCP_TAILSCALE_URL", "https://tailscale-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
+        "prefix": "ts",
+        "description": "Tailscale network management (devices, routes, ACL, auth keys)",
+        "enabled": True,
+        "transport": "json"
     }
 }
 
@@ -249,7 +256,7 @@ def handle_initialize(params):
     return {
         "protocolVersion": "2024-11-05",
         "capabilities": {"tools": {"listChanged": True}},
-        "serverInfo": {"name": "sovereign-mind-gateway", "version": "1.4.1"}
+        "serverInfo": {"name": "sovereign-mind-gateway", "version": "1.5.0"}
     }
 
 def handle_tools_list(params):
@@ -312,8 +319,8 @@ def health_check():
     return jsonify({
         "status": "healthy",
         "service": "sovereign-mind-gateway",
-        "version": "1.4.1",
-        "features": ["mcp-proxy", "sse-transport", "web-scrapers", "make-sse-support"],
+        "version": "1.5.0",
+        "features": ["mcp-proxy", "sse-transport", "web-scrapers", "make-sse-support", "tailscale"],
         "backends": list(BACKEND_MCPS.keys()),
         "total_tools": len(catalog.tools) if catalog.tools else "not yet loaded"
     })
@@ -506,7 +513,7 @@ def gfdata_status():
 # =============================================================================
 
 if __name__ == "__main__":
-    logger.info("Sovereign Mind MCP Gateway v1.4.1 starting...")
+    logger.info("Sovereign Mind MCP Gateway v1.5.0 starting...")
     run_async(catalog.refresh())
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
