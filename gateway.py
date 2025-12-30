@@ -1,14 +1,10 @@
 """
-Sovereign Mind MCP Gateway
+Sovereign Mind MCP Gateway v1.7.0
 ==========================
 Unified MCP server that aggregates tools from multiple backend services.
 Provides single connection point for Claude.ai, ElevenLabs ABBI, and future agents.
 
-Architecture:
-- Central gateway exposes namespaced tools (e.g., snowflake_query, asana_create_task)
-- Routes requests to appropriate backend MCP servers or APIs
-- Handles authentication centrally via environment variables
-- Supports both standard HTTP and SSE transports for different clients
+v1.7.0 - Added M365 Email/Calendar integration
 """
 
 import os
@@ -59,6 +55,12 @@ class GatewayConfig:
     
     # Google Cloud
     GOOGLE_APPLICATION_CREDENTIALS = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "")
+    
+    # M365 / Microsoft Graph
+    M365_TENANT_ID = os.getenv("M365_TENANT_ID", "")
+    M365_CLIENT_ID = os.getenv("M365_CLIENT_ID", "")
+    M365_CLIENT_SECRET = os.getenv("M365_CLIENT_SECRET", "")
+    M365_DEFAULT_USER = os.getenv("M365_DEFAULT_USER", "john@middlegroundcapital.com")
 
 config = GatewayConfig()
 
@@ -103,6 +105,69 @@ def format_error(message: str, suggestion: str = "") -> str:
     if suggestion:
         result += f"\nSuggestion: {suggestion}"
     return result
+
+# ============================================================================
+# M365 TOKEN MANAGEMENT
+# ============================================================================
+
+_m365_token_cache = {"token": None, "expires_at": 0}
+
+async def get_m365_token() -> str:
+    """Get M365 access token using client credentials flow."""
+    import time
+    
+    # Check cache
+    if _m365_token_cache["token"] and time.time() < _m365_token_cache["expires_at"] - 60:
+        return _m365_token_cache["token"]
+    
+    # Get new token
+    token_url = f"https://login.microsoftonline.com/{config.M365_TENANT_ID}/oauth2/v2.0/token"
+    
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            token_url,
+            data={
+                "client_id": config.M365_CLIENT_ID,
+                "client_secret": config.M365_CLIENT_SECRET,
+                "scope": "https://graph.microsoft.com/.default",
+                "grant_type": "client_credentials"
+            }
+        )
+        response.raise_for_status()
+        data = response.json()
+        
+        _m365_token_cache["token"] = data["access_token"]
+        _m365_token_cache["expires_at"] = time.time() + data.get("expires_in", 3600)
+        
+        return data["access_token"]
+
+async def m365_graph_request(
+    method: str,
+    endpoint: str,
+    json_data: Optional[Dict] = None,
+    params: Optional[Dict] = None,
+    timeout: float = 30.0
+) -> Dict[str, Any]:
+    """Make authenticated request to Microsoft Graph API."""
+    try:
+        token = await get_m365_token()
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json"
+        }
+        
+        url = f"https://graph.microsoft.com/v1.0{endpoint}"
+        
+        return await make_api_request(
+            method=method,
+            url=url,
+            headers=headers,
+            json_data=json_data,
+            params=params,
+            timeout=timeout
+        )
+    except Exception as e:
+        return {"error": True, "message": str(e)}
 
 # ============================================================================
 # LIFESPAN MANAGEMENT
@@ -163,9 +228,9 @@ class SnowflakeQueryInput(BaseModel):
     )
 
 @mcp.tool(
-    name="snowflake_query",
+    name="sm_query_snowflake",
     annotations={
-        "title": "Execute Snowflake Query",
+        "title": "[SM] Execute SQL query on Snowflake as JOHN_CLAUDE",
         "readOnlyHint": False,
         "destructiveHint": False,
         "idempotentHint": False,
@@ -177,12 +242,6 @@ async def snowflake_query(params: SnowflakeQueryInput) -> str:
     
     Supports all SQL operations including SELECT, INSERT, UPDATE, DELETE.
     Results are returned as JSON with column names and row data.
-    
-    Args:
-        params: Query parameters including SQL and optional database override
-        
-    Returns:
-        JSON string with query results or error message
     """
     try:
         import snowflake.connector
@@ -225,7 +284,6 @@ async def snowflake_query(params: SnowflakeQueryInput) -> str:
         return json.dumps({
             "success": True,
             "row_count": len(results),
-            "columns": columns,
             "data": results
         }, indent=2, default=str)
         
@@ -234,6 +292,391 @@ async def snowflake_query(params: SnowflakeQueryInput) -> str:
             "success": False,
             "error": str(e)
         })
+
+# ============================================================================
+# M365 EMAIL TOOLS
+# ============================================================================
+
+class M365ReadEmailsInput(BaseModel):
+    """Input for reading M365 emails."""
+    user_email: str = Field(
+        default="john@middlegroundcapital.com",
+        description="User email to read from"
+    )
+    folder: str = Field(
+        default="inbox",
+        description="Folder to read from (inbox, sentitems, drafts, or folder ID)"
+    )
+    top: int = Field(
+        default=25,
+        description="Number of emails to retrieve",
+        ge=1,
+        le=100
+    )
+    filter: Optional[str] = Field(
+        default=None,
+        description="OData filter expression (e.g., \"isRead eq false\")"
+    )
+    search: Optional[str] = Field(
+        default=None,
+        description="Search query for email content"
+    )
+
+@mcp.tool(
+    name="m365_read_emails",
+    annotations={
+        "title": "[M365] Read Emails",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True
+    }
+)
+async def m365_read_emails(params: M365ReadEmailsInput) -> str:
+    """Read emails from a user's mailbox.
+    
+    Returns emails with subject, sender, date, and preview.
+    """
+    endpoint = f"/users/{params.user_email}/mailFolders/{params.folder}/messages"
+    
+    query_params = {
+        "$top": params.top,
+        "$orderby": "receivedDateTime desc",
+        "$select": "id,subject,from,receivedDateTime,isRead,bodyPreview,hasAttachments"
+    }
+    
+    if params.filter:
+        query_params["$filter"] = params.filter
+    if params.search:
+        query_params["$search"] = f'"{params.search}"'
+    
+    result = await m365_graph_request("GET", endpoint, params=query_params)
+    
+    # Simplify response
+    if "value" in result:
+        emails = []
+        for email in result["value"]:
+            emails.append({
+                "id": email.get("id"),
+                "subject": email.get("subject"),
+                "from": email.get("from", {}).get("emailAddress", {}).get("address"),
+                "from_name": email.get("from", {}).get("emailAddress", {}).get("name"),
+                "received": email.get("receivedDateTime"),
+                "isRead": email.get("isRead"),
+                "preview": email.get("bodyPreview", "")[:200],
+                "hasAttachments": email.get("hasAttachments")
+            })
+        return json.dumps({"success": True, "count": len(emails), "emails": emails}, indent=2)
+    
+    return json.dumps(result, indent=2)
+
+class M365GetEmailInput(BaseModel):
+    """Input for getting a specific email."""
+    user_email: str = Field(default="john@middlegroundcapital.com")
+    message_id: str = Field(..., description="Email message ID")
+
+@mcp.tool(
+    name="m365_get_email",
+    annotations={
+        "title": "[M365] Get Email Details",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True
+    }
+)
+async def m365_get_email(params: M365GetEmailInput) -> str:
+    """Get full details of a specific email including body."""
+    endpoint = f"/users/{params.user_email}/messages/{params.message_id}"
+    
+    query_params = {
+        "$select": "id,subject,from,toRecipients,ccRecipients,receivedDateTime,body,hasAttachments,importance"
+    }
+    
+    result = await m365_graph_request("GET", endpoint, params=query_params)
+    return json.dumps(result, indent=2)
+
+class M365SearchEmailsInput(BaseModel):
+    """Input for searching emails."""
+    user_email: str = Field(default="john@middlegroundcapital.com")
+    query: str = Field(..., description="Search query")
+    top: int = Field(default=25, ge=1, le=100)
+
+@mcp.tool(
+    name="m365_search_emails",
+    annotations={
+        "title": "[M365] Search Emails",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True
+    }
+)
+async def m365_search_emails(params: M365SearchEmailsInput) -> str:
+    """Search emails across all folders."""
+    endpoint = f"/users/{params.user_email}/messages"
+    
+    query_params = {
+        "$search": f'"{params.query}"',
+        "$top": params.top,
+        "$orderby": "receivedDateTime desc",
+        "$select": "id,subject,from,receivedDateTime,bodyPreview,parentFolderId"
+    }
+    
+    result = await m365_graph_request("GET", endpoint, params=query_params)
+    
+    if "value" in result:
+        emails = []
+        for email in result["value"]:
+            emails.append({
+                "id": email.get("id"),
+                "subject": email.get("subject"),
+                "from": email.get("from", {}).get("emailAddress", {}).get("address"),
+                "received": email.get("receivedDateTime"),
+                "preview": email.get("bodyPreview", "")[:200],
+                "folder": email.get("parentFolderId")
+            })
+        return json.dumps({"success": True, "count": len(emails), "emails": emails}, indent=2)
+    
+    return json.dumps(result, indent=2)
+
+class M365ListFoldersInput(BaseModel):
+    """Input for listing mail folders."""
+    user_email: str = Field(default="john@middlegroundcapital.com")
+
+@mcp.tool(
+    name="m365_list_folders",
+    annotations={
+        "title": "[M365] List Mail Folders",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True
+    }
+)
+async def m365_list_folders(params: M365ListFoldersInput) -> str:
+    """List all mail folders for a user."""
+    endpoint = f"/users/{params.user_email}/mailFolders"
+    
+    query_params = {
+        "$select": "id,displayName,totalItemCount,unreadItemCount",
+        "$top": 100
+    }
+    
+    result = await m365_graph_request("GET", endpoint, params=query_params)
+    
+    if "value" in result:
+        folders = []
+        for folder in result["value"]:
+            folders.append({
+                "id": folder.get("id"),
+                "name": folder.get("displayName"),
+                "total": folder.get("totalItemCount"),
+                "unread": folder.get("unreadItemCount")
+            })
+        return json.dumps({"success": True, "folders": folders}, indent=2)
+    
+    return json.dumps(result, indent=2)
+
+class M365SendEmailInput(BaseModel):
+    """Input for sending an email."""
+    user_email: str = Field(default="john@middlegroundcapital.com")
+    to: List[str] = Field(..., description="List of recipient email addresses")
+    subject: str = Field(..., description="Email subject")
+    body: str = Field(..., description="Email body (HTML supported)")
+    cc: Optional[List[str]] = Field(default=None, description="CC recipients")
+    importance: str = Field(default="normal", description="normal, high, or low")
+
+@mcp.tool(
+    name="m365_send_email",
+    annotations={
+        "title": "[M365] Send Email",
+        "readOnlyHint": False,
+        "destructiveHint": False,
+        "idempotentHint": False,
+        "openWorldHint": True
+    }
+)
+async def m365_send_email(params: M365SendEmailInput) -> str:
+    """Send an email on behalf of a user."""
+    endpoint = f"/users/{params.user_email}/sendMail"
+    
+    message = {
+        "subject": params.subject,
+        "body": {
+            "contentType": "HTML",
+            "content": params.body
+        },
+        "toRecipients": [{"emailAddress": {"address": addr}} for addr in params.to],
+        "importance": params.importance
+    }
+    
+    if params.cc:
+        message["ccRecipients"] = [{"emailAddress": {"address": addr}} for addr in params.cc]
+    
+    result = await m365_graph_request("POST", endpoint, json_data={"message": message})
+    
+    if not result.get("error"):
+        return json.dumps({"success": True, "message": "Email sent successfully"}, indent=2)
+    
+    return json.dumps(result, indent=2)
+
+# ============================================================================
+# M365 CALENDAR TOOLS
+# ============================================================================
+
+class M365ListEventsInput(BaseModel):
+    """Input for listing calendar events."""
+    user_email: str = Field(default="john@middlegroundcapital.com")
+    start_date: Optional[str] = Field(default=None, description="Start date (YYYY-MM-DD)")
+    end_date: Optional[str] = Field(default=None, description="End date (YYYY-MM-DD)")
+    top: int = Field(default=25, ge=1, le=100)
+
+@mcp.tool(
+    name="m365_list_events",
+    annotations={
+        "title": "[M365] List Calendar Events",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True
+    }
+)
+async def m365_list_events(params: M365ListEventsInput) -> str:
+    """List calendar events for a user."""
+    from datetime import datetime, timedelta
+    
+    # Default to next 7 days if no dates specified
+    if not params.start_date:
+        start = datetime.utcnow()
+        params.start_date = start.strftime("%Y-%m-%dT00:00:00Z")
+    else:
+        params.start_date = f"{params.start_date}T00:00:00Z"
+    
+    if not params.end_date:
+        end = datetime.utcnow() + timedelta(days=7)
+        params.end_date = end.strftime("%Y-%m-%dT23:59:59Z")
+    else:
+        params.end_date = f"{params.end_date}T23:59:59Z"
+    
+    endpoint = f"/users/{params.user_email}/calendarView"
+    
+    query_params = {
+        "startDateTime": params.start_date,
+        "endDateTime": params.end_date,
+        "$top": params.top,
+        "$orderby": "start/dateTime",
+        "$select": "id,subject,start,end,location,organizer,attendees,isOnlineMeeting,onlineMeetingUrl"
+    }
+    
+    result = await m365_graph_request("GET", endpoint, params=query_params)
+    
+    if "value" in result:
+        events = []
+        for event in result["value"]:
+            events.append({
+                "id": event.get("id"),
+                "subject": event.get("subject"),
+                "start": event.get("start", {}).get("dateTime"),
+                "end": event.get("end", {}).get("dateTime"),
+                "location": event.get("location", {}).get("displayName"),
+                "organizer": event.get("organizer", {}).get("emailAddress", {}).get("address"),
+                "attendees": [a.get("emailAddress", {}).get("address") for a in event.get("attendees", [])],
+                "isOnline": event.get("isOnlineMeeting"),
+                "meetingUrl": event.get("onlineMeetingUrl")
+            })
+        return json.dumps({"success": True, "count": len(events), "events": events}, indent=2)
+    
+    return json.dumps(result, indent=2)
+
+class M365CreateEventInput(BaseModel):
+    """Input for creating a calendar event."""
+    user_email: str = Field(default="john@middlegroundcapital.com")
+    subject: str = Field(..., description="Event subject/title")
+    start: str = Field(..., description="Start datetime (YYYY-MM-DDTHH:MM:SS)")
+    end: str = Field(..., description="End datetime (YYYY-MM-DDTHH:MM:SS)")
+    attendees: Optional[List[str]] = Field(default=None, description="Attendee email addresses")
+    location: Optional[str] = Field(default=None, description="Event location")
+    body: Optional[str] = Field(default=None, description="Event description")
+    is_online: bool = Field(default=False, description="Create as Teams meeting")
+
+@mcp.tool(
+    name="m365_create_event",
+    annotations={
+        "title": "[M365] Create Calendar Event",
+        "readOnlyHint": False,
+        "destructiveHint": False,
+        "idempotentHint": False,
+        "openWorldHint": True
+    }
+)
+async def m365_create_event(params: M365CreateEventInput) -> str:
+    """Create a new calendar event."""
+    endpoint = f"/users/{params.user_email}/events"
+    
+    event = {
+        "subject": params.subject,
+        "start": {"dateTime": params.start, "timeZone": "America/New_York"},
+        "end": {"dateTime": params.end, "timeZone": "America/New_York"},
+        "isOnlineMeeting": params.is_online
+    }
+    
+    if params.is_online:
+        event["onlineMeetingProvider"] = "teamsForBusiness"
+    
+    if params.attendees:
+        event["attendees"] = [
+            {"emailAddress": {"address": addr}, "type": "required"}
+            for addr in params.attendees
+        ]
+    
+    if params.location:
+        event["location"] = {"displayName": params.location}
+    
+    if params.body:
+        event["body"] = {"contentType": "HTML", "content": params.body}
+    
+    result = await m365_graph_request("POST", endpoint, json_data=event)
+    return json.dumps(result, indent=2)
+
+class M365ListUsersInput(BaseModel):
+    """Input for listing M365 users."""
+    top: int = Field(default=50, ge=1, le=100)
+
+@mcp.tool(
+    name="m365_list_users",
+    annotations={
+        "title": "[M365] List Organization Users",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": True
+    }
+)
+async def m365_list_users(params: M365ListUsersInput) -> str:
+    """List users in the M365 organization."""
+    endpoint = "/users"
+    
+    query_params = {
+        "$top": params.top,
+        "$select": "id,displayName,mail,jobTitle,department"
+    }
+    
+    result = await m365_graph_request("GET", endpoint, params=query_params)
+    
+    if "value" in result:
+        users = []
+        for user in result["value"]:
+            users.append({
+                "id": user.get("id"),
+                "name": user.get("displayName"),
+                "email": user.get("mail"),
+                "title": user.get("jobTitle"),
+                "department": user.get("department")
+            })
+        return json.dumps({"success": True, "count": len(users), "users": users}, indent=2)
+    
+    return json.dumps(result, indent=2)
 
 # ============================================================================
 # ASANA TOOLS
@@ -282,16 +725,7 @@ class AsanaGetTasksInput(BaseModel):
     }
 )
 async def asana_get_tasks(params: AsanaGetTasksInput) -> str:
-    """Get tasks from Asana for the specified user or project.
-    
-    Returns a list of tasks with their names, due dates, and status.
-    
-    Args:
-        params: Filter parameters for task retrieval
-        
-    Returns:
-        JSON string with task list
-    """
+    """Get tasks from Asana for the specified user or project."""
     query_params = {
         "workspace": config.ASANA_WORKSPACE_ID,
         "assignee": params.assignee,
@@ -353,14 +787,7 @@ class AsanaCreateTaskInput(BaseModel):
     }
 )
 async def asana_create_task(params: AsanaCreateTaskInput) -> str:
-    """Create a new task in Asana.
-    
-    Args:
-        params: Task details including name, notes, due date
-        
-    Returns:
-        JSON string with created task details
-    """
+    """Create a new task in Asana."""
     data = {
         "data": {
             "name": params.name,
@@ -415,14 +842,7 @@ class AsanaSearchTasksInput(BaseModel):
     }
 )
 async def asana_search_tasks(params: AsanaSearchTasksInput) -> str:
-    """Search for tasks in Asana by text.
-    
-    Args:
-        params: Search parameters
-        
-    Returns:
-        JSON string with matching tasks
-    """
+    """Search for tasks in Asana by text."""
     query_params = {
         "text": params.text,
         "opt_fields": "name,due_on,completed,notes,assignee.name,projects.name",
@@ -456,14 +876,7 @@ class AsanaCompleteTaskInput(BaseModel):
     }
 )
 async def asana_complete_task(params: AsanaCompleteTaskInput) -> str:
-    """Mark an Asana task as complete.
-    
-    Args:
-        params: Task ID to complete
-        
-    Returns:
-        JSON string with updated task
-    """
+    """Mark an Asana task as complete."""
     result = await make_api_request(
         method="PUT",
         url=f"{ASANA_BASE_URL}/tasks/{params.task_id}",
@@ -489,14 +902,7 @@ class AsanaGetProjectsInput(BaseModel):
     }
 )
 async def asana_get_projects(params: AsanaGetProjectsInput) -> str:
-    """List all projects in the Asana workspace.
-    
-    Args:
-        params: Filter parameters
-        
-    Returns:
-        JSON string with project list
-    """
+    """List all projects in the Asana workspace."""
     result = await make_api_request(
         method="GET",
         url=f"{ASANA_BASE_URL}/projects",
@@ -539,11 +945,7 @@ class MakeListScenariosInput(BaseModel):
     }
 )
 async def make_list_scenarios(params: MakeListScenariosInput) -> str:
-    """List all scenarios in the Make.com team.
-    
-    Returns:
-        JSON string with scenario list including IDs and names
-    """
+    """List all scenarios in the Make.com team."""
     result = await make_api_request(
         method="GET",
         url=f"{MAKE_BASE_URL}/scenarios",
@@ -575,14 +977,7 @@ class MakeRunScenarioInput(BaseModel):
     }
 )
 async def make_run_scenario(params: MakeRunScenarioInput) -> str:
-    """Execute a Make.com scenario.
-    
-    Args:
-        params: Scenario ID and optional input data
-        
-    Returns:
-        JSON string with execution result
-    """
+    """Execute a Make.com scenario."""
     json_data = {}
     if params.data:
         json_data["data"] = params.data
@@ -611,14 +1006,7 @@ class MakeGetScenarioInput(BaseModel):
     }
 )
 async def make_get_scenario(params: MakeGetScenarioInput) -> str:
-    """Get details of a specific Make.com scenario.
-    
-    Args:
-        params: Scenario ID
-        
-    Returns:
-        JSON string with scenario details
-    """
+    """Get details of a specific Make.com scenario."""
     result = await make_api_request(
         method="GET",
         url=f"{MAKE_BASE_URL}/scenarios/{params.scenario_id}",
@@ -657,11 +1045,7 @@ class GitHubListReposInput(BaseModel):
     }
 )
 async def github_list_repos(params: GitHubListReposInput) -> str:
-    """List GitHub repositories for the authenticated user.
-    
-    Returns:
-        JSON string with repository list
-    """
+    """List GitHub repositories for the authenticated user."""
     result = await make_api_request(
         method="GET",
         url=f"{GITHUB_BASE_URL}/user/repos",
@@ -686,7 +1070,7 @@ async def github_list_repos(params: GitHubListReposInput) -> str:
             }
             for repo in result
         ]
-        return json.dumps({"repos": simplified}, indent=2)
+        return json.dumps({"success": True, "data": simplified}, indent=2)
     
     return json.dumps(result, indent=2)
 
@@ -707,14 +1091,7 @@ class GitHubGetFileInput(BaseModel):
     }
 )
 async def github_get_file(params: GitHubGetFileInput) -> str:
-    """Get contents of a file from a GitHub repository.
-    
-    Args:
-        params: Repository and file path details
-        
-    Returns:
-        JSON string with file content (base64 decoded if text)
-    """
+    """Get contents of a file from a GitHub repository."""
     result = await make_api_request(
         method="GET",
         url=f"{GITHUB_BASE_URL}/repos/{params.owner}/{params.repo}/contents/{params.path}",
@@ -730,6 +1107,57 @@ async def github_get_file(params: GitHubGetFileInput) -> str:
             del result["content"]  # Remove base64 to save space
         except Exception:
             pass
+    
+    return json.dumps(result, indent=2)
+
+class GitHubUpdateFileInput(BaseModel):
+    """Input for updating a GitHub file."""
+    owner: str = Field(..., description="Repository owner")
+    repo: str = Field(..., description="Repository name")
+    path: str = Field(..., description="File path in repository")
+    content: str = Field(..., description="New file content")
+    message: str = Field(..., description="Commit message")
+    sha: Optional[str] = Field(default=None, description="SHA of the file being replaced (required for updates)")
+
+@mcp.tool(
+    name="github_update_file",
+    annotations={
+        "title": "Update GitHub File",
+        "readOnlyHint": False,
+        "destructiveHint": False,
+        "idempotentHint": False,
+        "openWorldHint": True
+    }
+)
+async def github_update_file(params: GitHubUpdateFileInput) -> str:
+    """Create or update a file in a GitHub repository."""
+    import base64
+    
+    # If no SHA provided, try to get it (for updates)
+    sha = params.sha
+    if not sha:
+        existing = await make_api_request(
+            method="GET",
+            url=f"{GITHUB_BASE_URL}/repos/{params.owner}/{params.repo}/contents/{params.path}",
+            headers=get_github_headers()
+        )
+        if isinstance(existing, dict) and "sha" in existing:
+            sha = existing["sha"]
+    
+    data = {
+        "message": params.message,
+        "content": base64.b64encode(params.content.encode()).decode()
+    }
+    
+    if sha:
+        data["sha"] = sha
+    
+    result = await make_api_request(
+        method="PUT",
+        url=f"{GITHUB_BASE_URL}/repos/{params.owner}/{params.repo}/contents/{params.path}",
+        headers=get_github_headers(),
+        json_data=data
+    )
     
     return json.dumps(result, indent=2)
 
@@ -761,11 +1189,7 @@ class ElevenLabsListAgentsInput(BaseModel):
     }
 )
 async def elevenlabs_list_agents(params: ElevenLabsListAgentsInput) -> str:
-    """List all conversational AI agents in ElevenLabs.
-    
-    Returns:
-        JSON string with agent list
-    """
+    """List all conversational AI agents in ElevenLabs."""
     result = await make_api_request(
         method="GET",
         url=f"{ELEVENLABS_BASE_URL}/convai/agents",
@@ -789,14 +1213,7 @@ class ElevenLabsGetAgentInput(BaseModel):
     }
 )
 async def elevenlabs_get_agent(params: ElevenLabsGetAgentInput) -> str:
-    """Get details of a specific ElevenLabs agent.
-    
-    Args:
-        params: Agent ID
-        
-    Returns:
-        JSON string with agent configuration
-    """
+    """Get details of a specific ElevenLabs agent."""
     result = await make_api_request(
         method="GET",
         url=f"{ELEVENLABS_BASE_URL}/convai/agents/{params.agent_id}",
@@ -847,18 +1264,9 @@ class HiveMindWriteInput(BaseModel):
     }
 )
 async def hivemind_write(params: HiveMindWriteInput) -> str:
-    """Write an entry to the Sovereign Mind Hive Mind shared memory.
-    
-    This allows AI instances to share context with each other.
-    
-    Args:
-        params: Memory entry details
-        
-    Returns:
-        Confirmation of write operation
-    """
+    """Write an entry to the Sovereign Mind Hive Mind shared memory."""
     sql = f"""
-    INSERT INTO SOVEREIGN_MIND.RAW.SHARED_MEMORY 
+    INSERT INTO SOVEREIGN_MIND.RAW.HIVE_MIND 
     (SOURCE, CATEGORY, WORKSTREAM, SUMMARY, PRIORITY, STATUS)
     VALUES ('{params.source}', '{params.category}', '{params.workstream}', 
             '{params.summary.replace("'", "''")}', '{params.priority}', 'ACTIVE')
@@ -892,16 +1300,7 @@ class HiveMindReadInput(BaseModel):
     }
 )
 async def hivemind_read(params: HiveMindReadInput) -> str:
-    """Read recent entries from the Sovereign Mind Hive Mind.
-    
-    Returns shared memory entries from all AI instances.
-    
-    Args:
-        params: Filter and limit parameters
-        
-    Returns:
-        JSON string with memory entries
-    """
+    """Read recent entries from the Sovereign Mind Hive Mind."""
     where_clauses = ["STATUS = 'ACTIVE'"]
     if params.source:
         where_clauses.append(f"SOURCE = '{params.source}'")
@@ -912,7 +1311,7 @@ async def hivemind_read(params: HiveMindReadInput) -> str:
     
     sql = f"""
     SELECT SOURCE, CATEGORY, WORKSTREAM, SUMMARY, PRIORITY, CREATED_AT
-    FROM SOVEREIGN_MIND.RAW.SHARED_MEMORY
+    FROM SOVEREIGN_MIND.RAW.HIVE_MIND
     WHERE {where_sql}
     ORDER BY CREATED_AT DESC
     LIMIT {params.limit}
@@ -940,16 +1339,10 @@ class GatewayStatusInput(BaseModel):
     }
 )
 async def gateway_status(params: GatewayStatusInput) -> str:
-    """Get the status of the Sovereign Mind MCP Gateway.
-    
-    Returns information about available services and their configuration status.
-    
-    Returns:
-        JSON string with gateway status
-    """
+    """Get the status of the Sovereign Mind MCP Gateway."""
     status = {
         "gateway": "sovereign_mind_gateway",
-        "version": "1.0.1",
+        "version": "1.7.0",
         "timestamp": datetime.utcnow().isoformat(),
         "services": {
             "snowflake": {
@@ -970,26 +1363,37 @@ async def gateway_status(params: GatewayStatusInput) -> str:
             },
             "elevenlabs": {
                 "configured": bool(config.ELEVENLABS_API_KEY)
+            },
+            "m365": {
+                "configured": bool(config.M365_CLIENT_SECRET),
+                "tenant_id": config.M365_TENANT_ID[:8] + "..." if config.M365_TENANT_ID else None,
+                "default_user": config.M365_DEFAULT_USER
             }
         },
         "tools": [
-            "snowflake_query",
+            # Snowflake
+            "sm_query_snowflake",
+            # M365
+            "m365_read_emails", "m365_get_email", "m365_search_emails",
+            "m365_list_folders", "m365_send_email",
+            "m365_list_events", "m365_create_event", "m365_list_users",
+            # Asana
             "asana_get_tasks", "asana_create_task", "asana_search_tasks",
             "asana_complete_task", "asana_get_projects",
+            # Make.com
             "make_list_scenarios", "make_run_scenario", "make_get_scenario",
-            "github_list_repos", "github_get_file",
+            # GitHub
+            "github_list_repos", "github_get_file", "github_update_file",
+            # ElevenLabs
             "elevenlabs_list_agents", "elevenlabs_get_agent",
+            # Hive Mind
             "hivemind_write", "hivemind_read",
+            # Gateway
             "gateway_status"
         ]
     }
     
     return json.dumps(status, indent=2)
-
-# ============================================================================
-# MAIN ENTRY POINT
-# ============================================================================
-
 
 # ============================================================================
 # MAC STUDIO TOOLS (via Tailscale Funnel)
@@ -1072,6 +1476,10 @@ async def mac_health(params: MacHealthInput) -> str:
         timeout=10.0
     )
     return json.dumps(result, indent=2)
+
+# ============================================================================
+# MAIN ENTRY POINT
+# ============================================================================
 
 if __name__ == "__main__":
     import sys
