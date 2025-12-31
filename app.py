@@ -85,85 +85,13 @@ BACKEND_MCPS = {
         "health_check": False
     },
     "dealcloud": {
-    "dropbox": {
-        "url": os.environ.get("MCP_DROPBOX_URL", "https://dropbox-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
-        "prefix": "dropbox",
-        "description": "Dropbox file storage for MiddleGround",
-        "enabled": True,
-        "transport": "json",
-        "priority": 1,
-        "health_check": False
-    },
         "url": os.environ.get("MCP_DEALCLOUD_URL", "https://dealcloud-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
-    "dropbox": {
-        "url": os.environ.get("MCP_DROPBOX_URL", "https://dropbox-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
-        "prefix": "dropbox",
-        "description": "Dropbox file storage for MiddleGround",
-        "enabled": True,
-        "transport": "json",
-        "priority": 1,
-        "health_check": False
-    },
         "prefix": "dc",
-    "dropbox": {
-        "url": os.environ.get("MCP_DROPBOX_URL", "https://dropbox-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
-        "prefix": "dropbox",
-        "description": "Dropbox file storage for MiddleGround",
-        "enabled": True,
-        "transport": "json",
-        "priority": 1,
-        "health_check": False
-    },
         "description": "DealCloud CRM",
-    "dropbox": {
-        "url": os.environ.get("MCP_DROPBOX_URL", "https://dropbox-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
-        "prefix": "dropbox",
-        "description": "Dropbox file storage for MiddleGround",
         "enabled": True,
         "transport": "json",
         "priority": 1,
         "health_check": False
-    },
-        "enabled": True,
-    "dropbox": {
-        "url": os.environ.get("MCP_DROPBOX_URL", "https://dropbox-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
-        "prefix": "dropbox",
-        "description": "Dropbox file storage for MiddleGround",
-        "enabled": True,
-        "transport": "json",
-        "priority": 1,
-        "health_check": False
-    },
-        "transport": "json",
-    "dropbox": {
-        "url": os.environ.get("MCP_DROPBOX_URL", "https://dropbox-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
-        "prefix": "dropbox",
-        "description": "Dropbox file storage for MiddleGround",
-        "enabled": True,
-        "transport": "json",
-        "priority": 1,
-        "health_check": False
-    },
-        "priority": 1,
-    "dropbox": {
-        "url": os.environ.get("MCP_DROPBOX_URL", "https://dropbox-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
-        "prefix": "dropbox",
-        "description": "Dropbox file storage for MiddleGround",
-        "enabled": True,
-        "transport": "json",
-        "priority": 1,
-        "health_check": False
-    },
-        "health_check": False
-    "dropbox": {
-        "url": os.environ.get("MCP_DROPBOX_URL", "https://dropbox-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
-        "prefix": "dropbox",
-        "description": "Dropbox file storage for MiddleGround",
-        "enabled": True,
-        "transport": "json",
-        "priority": 1,
-        "health_check": False
-    },
     },
     "dropbox": {
         "url": os.environ.get("MCP_DROPBOX_URL", "https://dropbox-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
