@@ -37,7 +37,7 @@ BACKEND_MCPS = {
         "enabled": True,
         "transport": "json",
         "priority": 1,
-        "health_check": True
+        "health_check": False
     },
     "googledrive": {
         "url": os.environ.get("MCP_GOOGLEDRIVE_URL", "https://google-drive-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
@@ -46,7 +46,7 @@ BACKEND_MCPS = {
         "enabled": True,
         "transport": "json",
         "priority": 1,
-        "health_check": True
+        "health_check": False
     },
     "m365": {
         "url": os.environ.get("MCP_M365_URL", "https://m365-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
@@ -55,7 +55,7 @@ BACKEND_MCPS = {
         "enabled": True,
         "transport": "json",
         "priority": 1,
-        "health_check": True
+        "health_check": False
     },
     "asana": {
         "url": os.environ.get("MCP_ASANA_URL", "https://asana-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
@@ -64,7 +64,7 @@ BACKEND_MCPS = {
         "enabled": True,
         "transport": "json",
         "priority": 1,
-        "health_check": True
+        "health_check": False
     },
     "github": {
         "url": os.environ.get("MCP_GITHUB_URL", "https://github-mcp.redglacier-26075659.eastus.azurecontainerapps.io/mcp"),
@@ -73,7 +73,7 @@ BACKEND_MCPS = {
         "enabled": True,
         "transport": "json",
         "priority": 1,
-        "health_check": True
+        "health_check": False
     },
     "azure": {
         "url": os.environ.get("MCP_AZURE_URL", "https://azure-cli-mcp.calmsmoke-f302257e.eastus.azurecontainerapps.io/mcp"),
@@ -82,7 +82,7 @@ BACKEND_MCPS = {
         "enabled": True,
         "transport": "json",
         "priority": 2,
-        "health_check": True
+        "health_check": False
     },
     "dealcloud": {
         "url": os.environ.get("MCP_DEALCLOUD_URL", "https://dealcloud-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
@@ -91,7 +91,7 @@ BACKEND_MCPS = {
         "enabled": True,
         "transport": "json",
         "priority": 1,
-        "health_check": True
+        "health_check": False
     },
     "make": {
         "url": os.environ.get("MCP_MAKE_URL", "https://us2.make.com/mcp/u/7129f411-923e-4acd-b63f-d436d38939dc/stateless"),
@@ -111,7 +111,7 @@ BACKEND_MCPS = {
         "enabled": True,
         "transport": "json",
         "priority": 2,
-        "health_check": True
+        "health_check": False
     },
     "simli": {
         "url": os.environ.get("MCP_SIMLI_URL", "https://simli-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
@@ -120,7 +120,7 @@ BACKEND_MCPS = {
         "enabled": True,
         "transport": "json",
         "priority": 3,
-        "health_check": True
+        "health_check": False
     },
     "gemini": {
         "url": os.environ.get("MCP_GEMINI_URL", "https://gemini-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
@@ -129,7 +129,7 @@ BACKEND_MCPS = {
         "enabled": True,
         "transport": "json",
         "priority": 2,
-        "health_check": True
+        "health_check": False
     },
     "notebooklm": {
         "url": os.environ.get("MCP_NOTEBOOKLM_URL", "https://notebooklm-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
@@ -138,7 +138,7 @@ BACKEND_MCPS = {
         "enabled": True,
         "transport": "json",
         "priority": 3,
-        "health_check": True
+        "health_check": False
     },
     "vertex": {
         "url": os.environ.get("MCP_VERTEX_URL", "https://vertex-ai-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
@@ -147,7 +147,7 @@ BACKEND_MCPS = {
         "enabled": True,
         "transport": "json",
         "priority": 2,
-        "health_check": True
+        "health_check": False
     },
     "figma": {
         "url": os.environ.get("MCP_FIGMA_URL", "https://figma-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
@@ -156,7 +156,7 @@ BACKEND_MCPS = {
         "enabled": True,
         "transport": "json",
         "priority": 3,
-        "health_check": True
+        "health_check": False
     },
     "vectorizer": {
         "url": os.environ.get("MCP_VECTORIZER_URL", "https://slide-transform-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
@@ -165,7 +165,7 @@ BACKEND_MCPS = {
         "enabled": True,
         "transport": "json",
         "priority": 3,
-        "health_check": True
+        "health_check": False
     },
     "tailscale": {
         "url": os.environ.get("MCP_TAILSCALE_URL", "https://tailscale-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
@@ -174,7 +174,7 @@ BACKEND_MCPS = {
         "enabled": True,
         "transport": "json",
         "priority": 2,
-        "health_check": True
+        "health_check": False
     },
     "mac_studio": {
         "url": os.environ.get("MCP_MACSTUDIO_URL", "https://mac-studio-mcp.tail96c90.ts.net/mcp"),
@@ -183,7 +183,7 @@ BACKEND_MCPS = {
         "enabled": True,
         "transport": "json",
         "priority": 2,
-        "health_check": True,
+        "health_check": False,
         "alt_url": "http://100.70.153.106:8080/mcp"
     }
 }
@@ -373,7 +373,7 @@ async def call_backend_tool(backend_url: str, tool_name: str, arguments: dict, t
 
 def handle_native_tool(tool_name: str, arguments: dict) -> Dict:
     if tool_name == "gateway_status":
-        return {"content": [{"type": "text", "text": json.dumps({"gateway": "sovereign_mind_gateway", "version": "2.1.2", "timestamp": datetime.now().isoformat(), "health": catalog.get_health_report(), "backends_configured": list(BACKEND_MCPS.keys())}, indent=2)}]}
+        return {"content": [{"type": "text", "text": json.dumps({"gateway": "sovereign_mind_gateway", "version": "2.1.3", "timestamp": datetime.now().isoformat(), "health": catalog.get_health_report(), "backends_configured": list(BACKEND_MCPS.keys())}, indent=2)}]}
     elif tool_name == "hivemind_write":
         tool_info = catalog.get_tool("sm_query_snowflake")
         if not tool_info:
@@ -408,7 +408,7 @@ def handle_native_tool(tool_name: str, arguments: dict) -> Dict:
     return {"content": [{"type": "text", "text": f"Unknown native tool: {tool_name}"}], "isError": True}
 
 def handle_initialize(params: dict) -> Dict:
-    return {"protocolVersion": "2024-11-05", "capabilities": {"tools": {"listChanged": True}}, "serverInfo": {"name": "sovereign-mind-gateway", "version": "2.1.2"}}
+    return {"protocolVersion": "2024-11-05", "capabilities": {"tools": {"listChanged": True}}, "serverInfo": {"name": "sovereign-mind-gateway", "version": "2.1.3"}}
 
 def handle_tools_list(params: dict) -> Dict:
     if catalog.needs_refresh():
@@ -451,7 +451,7 @@ def process_mcp_message(data: dict) -> Dict:
 
 @app.route("/", methods=["GET"])
 def health_check():
-    return jsonify({"status": "healthy", "service": "sovereign-mind-gateway", "version": "2.1.2", "features": ["mcp-proxy", "sse-transport", "health-monitoring", "native-hivemind", "graceful-fallback"], "backends": list(BACKEND_MCPS.keys()), "total_tools": len(catalog.tools) + len(NATIVE_TOOLS) if catalog.tools else "not yet loaded"})
+    return jsonify({"status": "healthy", "service": "sovereign-mind-gateway", "version": "2.1.3", "features": ["mcp-proxy", "sse-transport", "health-monitoring", "native-hivemind", "graceful-fallback"], "backends": list(BACKEND_MCPS.keys()), "total_tools": len(catalog.tools) + len(NATIVE_TOOLS) if catalog.tools else "not yet loaded"})
 
 @app.route("/mcp", methods=["POST"])
 def mcp_handler():
