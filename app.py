@@ -210,16 +210,19 @@ class ToolCatalog:
         return (datetime.now() - self.last_refresh).seconds > self.refresh_interval
     
     async def check_backend_health(self, client: httpx.AsyncClient, name: str, config: Dict) -> bool:
+        """Health check - accepts any HTTP response (including 404) as reachable."""
         if not config.get("health_check", True):
             return True
         try:
+            # Try root endpoint first, accept any response as "reachable"
             response = await client.get(config["url"].replace("/mcp", "/"), timeout=10.0)
-            return response.status_code == 200
+            # Accept 200, 404, or any response - just verify network connectivity
+            return response.status_code in [200, 404, 405, 501]
         except Exception:
             if config.get("alt_url"):
                 try:
                     response = await client.get(config["alt_url"].replace("/mcp", "/"), timeout=10.0)
-                    return response.status_code == 200
+                    return response.status_code in [200, 404, 405, 501]
                 except Exception:
                     pass
             return False
@@ -370,7 +373,7 @@ async def call_backend_tool(backend_url: str, tool_name: str, arguments: dict, t
 
 def handle_native_tool(tool_name: str, arguments: dict) -> Dict:
     if tool_name == "gateway_status":
-        return {"content": [{"type": "text", "text": json.dumps({"gateway": "sovereign_mind_gateway", "version": "2.0.0", "timestamp": datetime.now().isoformat(), "health": catalog.get_health_report(), "backends_configured": list(BACKEND_MCPS.keys())}, indent=2)}]}
+        return {"content": [{"type": "text", "text": json.dumps({"gateway": "sovereign_mind_gateway", "version": "2.1.2", "timestamp": datetime.now().isoformat(), "health": catalog.get_health_report(), "backends_configured": list(BACKEND_MCPS.keys())}, indent=2)}]}
     elif tool_name == "hivemind_write":
         tool_info = catalog.get_tool("sm_query_snowflake")
         if not tool_info:
@@ -405,7 +408,7 @@ def handle_native_tool(tool_name: str, arguments: dict) -> Dict:
     return {"content": [{"type": "text", "text": f"Unknown native tool: {tool_name}"}], "isError": True}
 
 def handle_initialize(params: dict) -> Dict:
-    return {"protocolVersion": "2024-11-05", "capabilities": {"tools": {"listChanged": True}}, "serverInfo": {"name": "sovereign-mind-gateway", "version": "2.0.0"}}
+    return {"protocolVersion": "2024-11-05", "capabilities": {"tools": {"listChanged": True}}, "serverInfo": {"name": "sovereign-mind-gateway", "version": "2.1.2"}}
 
 def handle_tools_list(params: dict) -> Dict:
     if catalog.needs_refresh():
@@ -448,7 +451,7 @@ def process_mcp_message(data: dict) -> Dict:
 
 @app.route("/", methods=["GET"])
 def health_check():
-    return jsonify({"status": "healthy", "service": "sovereign-mind-gateway", "version": "2.0.0", "features": ["mcp-proxy", "sse-transport", "health-monitoring", "native-hivemind", "graceful-fallback"], "backends": list(BACKEND_MCPS.keys()), "total_tools": len(catalog.tools) + len(NATIVE_TOOLS) if catalog.tools else "not yet loaded"})
+    return jsonify({"status": "healthy", "service": "sovereign-mind-gateway", "version": "2.1.2", "features": ["mcp-proxy", "sse-transport", "health-monitoring", "native-hivemind", "graceful-fallback"], "backends": list(BACKEND_MCPS.keys()), "total_tools": len(catalog.tools) + len(NATIVE_TOOLS) if catalog.tools else "not yet loaded"})
 
 @app.route("/mcp", methods=["POST"])
 def mcp_handler():
