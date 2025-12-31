@@ -85,9 +85,90 @@ BACKEND_MCPS = {
         "health_check": False
     },
     "dealcloud": {
+    "dropbox": {
+        "url": os.environ.get("MCP_DROPBOX_URL", "https://dropbox-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
+        "prefix": "dropbox",
+        "description": "Dropbox file storage for MiddleGround",
+        "enabled": True,
+        "transport": "json",
+        "priority": 1,
+        "health_check": False
+    },
         "url": os.environ.get("MCP_DEALCLOUD_URL", "https://dealcloud-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
+    "dropbox": {
+        "url": os.environ.get("MCP_DROPBOX_URL", "https://dropbox-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
+        "prefix": "dropbox",
+        "description": "Dropbox file storage for MiddleGround",
+        "enabled": True,
+        "transport": "json",
+        "priority": 1,
+        "health_check": False
+    },
         "prefix": "dc",
+    "dropbox": {
+        "url": os.environ.get("MCP_DROPBOX_URL", "https://dropbox-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
+        "prefix": "dropbox",
+        "description": "Dropbox file storage for MiddleGround",
+        "enabled": True,
+        "transport": "json",
+        "priority": 1,
+        "health_check": False
+    },
         "description": "DealCloud CRM",
+    "dropbox": {
+        "url": os.environ.get("MCP_DROPBOX_URL", "https://dropbox-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
+        "prefix": "dropbox",
+        "description": "Dropbox file storage for MiddleGround",
+        "enabled": True,
+        "transport": "json",
+        "priority": 1,
+        "health_check": False
+    },
+        "enabled": True,
+    "dropbox": {
+        "url": os.environ.get("MCP_DROPBOX_URL", "https://dropbox-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
+        "prefix": "dropbox",
+        "description": "Dropbox file storage for MiddleGround",
+        "enabled": True,
+        "transport": "json",
+        "priority": 1,
+        "health_check": False
+    },
+        "transport": "json",
+    "dropbox": {
+        "url": os.environ.get("MCP_DROPBOX_URL", "https://dropbox-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
+        "prefix": "dropbox",
+        "description": "Dropbox file storage for MiddleGround",
+        "enabled": True,
+        "transport": "json",
+        "priority": 1,
+        "health_check": False
+    },
+        "priority": 1,
+    "dropbox": {
+        "url": os.environ.get("MCP_DROPBOX_URL", "https://dropbox-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
+        "prefix": "dropbox",
+        "description": "Dropbox file storage for MiddleGround",
+        "enabled": True,
+        "transport": "json",
+        "priority": 1,
+        "health_check": False
+    },
+        "health_check": False
+    "dropbox": {
+        "url": os.environ.get("MCP_DROPBOX_URL", "https://dropbox-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
+        "prefix": "dropbox",
+        "description": "Dropbox file storage for MiddleGround",
+        "enabled": True,
+        "transport": "json",
+        "priority": 1,
+        "health_check": False
+    },
+    },
+    "dropbox": {
+        "url": os.environ.get("MCP_DROPBOX_URL", "https://dropbox-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
+        "prefix": "dropbox",
+        "description": "Dropbox file storage for MiddleGround",
         "enabled": True,
         "transport": "json",
         "priority": 1,
@@ -373,7 +454,7 @@ async def call_backend_tool(backend_url: str, tool_name: str, arguments: dict, t
 
 def handle_native_tool(tool_name: str, arguments: dict) -> Dict:
     if tool_name == "gateway_status":
-        return {"content": [{"type": "text", "text": json.dumps({"gateway": "sovereign_mind_gateway", "version": "2.1.3", "timestamp": datetime.now().isoformat(), "health": catalog.get_health_report(), "backends_configured": list(BACKEND_MCPS.keys())}, indent=2)}]}
+        return {"content": [{"type": "text", "text": json.dumps({"gateway": "sovereign_mind_gateway", "version": "2.1.4", "timestamp": datetime.now().isoformat(), "health": catalog.get_health_report(), "backends_configured": list(BACKEND_MCPS.keys())}, indent=2)}]}
     elif tool_name == "hivemind_write":
         tool_info = catalog.get_tool("sm_query_snowflake")
         if not tool_info:
@@ -408,7 +489,7 @@ def handle_native_tool(tool_name: str, arguments: dict) -> Dict:
     return {"content": [{"type": "text", "text": f"Unknown native tool: {tool_name}"}], "isError": True}
 
 def handle_initialize(params: dict) -> Dict:
-    return {"protocolVersion": "2024-11-05", "capabilities": {"tools": {"listChanged": True}}, "serverInfo": {"name": "sovereign-mind-gateway", "version": "2.1.3"}}
+    return {"protocolVersion": "2024-11-05", "capabilities": {"tools": {"listChanged": True}}, "serverInfo": {"name": "sovereign-mind-gateway", "version": "2.1.4"}}
 
 def handle_tools_list(params: dict) -> Dict:
     if catalog.needs_refresh():
@@ -451,7 +532,7 @@ def process_mcp_message(data: dict) -> Dict:
 
 @app.route("/", methods=["GET"])
 def health_check():
-    return jsonify({"status": "healthy", "service": "sovereign-mind-gateway", "version": "2.1.3", "features": ["mcp-proxy", "sse-transport", "health-monitoring", "native-hivemind", "graceful-fallback"], "backends": list(BACKEND_MCPS.keys()), "total_tools": len(catalog.tools) + len(NATIVE_TOOLS) if catalog.tools else "not yet loaded"})
+    return jsonify({"status": "healthy", "service": "sovereign-mind-gateway", "version": "2.1.4", "features": ["mcp-proxy", "sse-transport", "health-monitoring", "native-hivemind", "graceful-fallback"], "backends": list(BACKEND_MCPS.keys()), "total_tools": len(catalog.tools) + len(NATIVE_TOOLS) if catalog.tools else "not yet loaded"})
 
 @app.route("/mcp", methods=["POST"])
 def mcp_handler():
