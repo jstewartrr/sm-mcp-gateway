@@ -31,7 +31,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Install Playwright and chromium browser
 RUN playwright install chromium && playwright install-deps chromium
 
-# Copy unified gateway (NOT proxy app.py)
+# Copy Flask-based proxy gateway (Claude.ai compatible)
+COPY app.py .
 COPY gateway.py .
 COPY gateway_sse.py .
 COPY scrapers/ ./scrapers/
@@ -39,7 +40,6 @@ COPY scrapers/ ./scrapers/
 # Expose port
 EXPOSE 8080
 
-# Run unified gateway with uvicorn (FastMCP uses ASGI)
+# Run Flask proxy gateway (JSON-RPC compatible with Claude.ai)
 ENV PORT=8080
-ENV MCP_TRANSPORT=streamable_http
-CMD ["python", "gateway.py"]
+CMD ["python", "app.py"]
