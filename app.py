@@ -1,5 +1,5 @@
 """
-Sovereign Mind MCP Gateway v2.1.6
+Sovereign Mind MCP Gateway v2.1.7
 ==================================
 A unified, production-ready MCP server with comprehensive backend support.
 All backends configured with proper error handling and graceful fallback.
@@ -7,7 +7,7 @@ Now with CORS support for browser access.
 
 Backends: Snowflake, Google Drive, GitHub, M365, Asana, ElevenLabs, DealCloud,
           Make.com, Tailscale, Gemini, NotebookLM, Vertex AI, Azure CLI,
-          Simli, Vectorizer, Figma, Mac Studio (Tailscale Funnel)
+          Simli, Vectorizer, Figma, Mac Studio, Grok, Vercel, Cloudflare, AWS
 
 Author: ABBI (Adaptive Second Brain Intelligence)
 """
@@ -206,6 +206,33 @@ BACKEND_MCPS = {
         "transport": "json",
         "priority": 1,
         "health_check": False
+    },
+    "vercel": {
+        "url": os.environ.get("MCP_VERCEL_URL", "https://vercel-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
+        "prefix": "vercel",
+        "description": "Vercel deployments, projects, domains, environment variables",
+        "enabled": True,
+        "transport": "json",
+        "priority": 2,
+        "health_check": False
+    },
+    "cloudflare": {
+        "url": os.environ.get("MCP_CLOUDFLARE_URL", "https://cloudflare-mcp.lemoncoast-87756bcf.eastus.azurecontainerapps.io/mcp"),
+        "prefix": "cf",
+        "description": "Cloudflare Pages, DNS, zones, SSL, cache management",
+        "enabled": True,
+        "transport": "json",
+        "priority": 2,
+        "health_check": False
+    },
+    "aws": {
+        "url": os.environ.get("MCP_AWS_URL", "https://mamktfczh9.us-east-1.awsapprunner.com/mcp"),
+        "prefix": "aws",
+        "description": "AWS services - EC2, S3, Lambda, IAM, CloudWatch, RDS, SNS, SQS, Bedrock",
+        "enabled": True,
+        "transport": "json",
+        "priority": 1,
+        "health_check": False
     }
 }
 
@@ -391,7 +418,7 @@ async def call_backend_tool(backend_url: str, tool_name: str, arguments: dict, t
 
 def handle_native_tool(tool_name: str, arguments: dict) -> Dict:
     if tool_name == "gateway_status":
-        return {"content": [{"type": "text", "text": json.dumps({"gateway": "sovereign_mind_gateway", "version": "2.1.6", "timestamp": datetime.now().isoformat(), "health": catalog.get_health_report(), "backends_configured": list(BACKEND_MCPS.keys())}, indent=2)}]}
+        return {"content": [{"type": "text", "text": json.dumps({"gateway": "sovereign_mind_gateway", "version": "2.1.7", "timestamp": datetime.now().isoformat(), "health": catalog.get_health_report(), "backends_configured": list(BACKEND_MCPS.keys())}, indent=2)}]}
     elif tool_name == "hivemind_write":
         tool_info = catalog.get_tool("sm_query_snowflake")
         if not tool_info:
@@ -426,7 +453,7 @@ def handle_native_tool(tool_name: str, arguments: dict) -> Dict:
     return {"content": [{"type": "text", "text": f"Unknown native tool: {tool_name}"}], "isError": True}
 
 def handle_initialize(params: dict) -> Dict:
-    return {"protocolVersion": "2024-11-05", "capabilities": {"tools": {"listChanged": True}}, "serverInfo": {"name": "sovereign-mind-gateway", "version": "2.1.6"}}
+    return {"protocolVersion": "2024-11-05", "capabilities": {"tools": {"listChanged": True}}, "serverInfo": {"name": "sovereign-mind-gateway", "version": "2.1.7"}}
 
 def handle_tools_list(params: dict) -> Dict:
     if catalog.needs_refresh():
@@ -469,7 +496,7 @@ def process_mcp_message(data: dict) -> Dict:
 
 @app.route("/", methods=["GET"])
 def health_check():
-    return jsonify({"status": "healthy", "service": "sovereign-mind-gateway", "version": "2.1.6", "cors": "enabled", "features": ["mcp-proxy", "sse-transport", "health-monitoring", "native-hivemind", "graceful-fallback", "cors-enabled"], "backends": list(BACKEND_MCPS.keys()), "total_tools": len(catalog.tools) + len(NATIVE_TOOLS) if catalog.tools else "not yet loaded"})
+    return jsonify({"status": "healthy", "service": "sovereign-mind-gateway", "version": "2.1.7", "cors": "enabled", "features": ["mcp-proxy", "sse-transport", "health-monitoring", "native-hivemind", "graceful-fallback", "cors-enabled"], "backends": list(BACKEND_MCPS.keys()), "total_tools": len(catalog.tools) + len(NATIVE_TOOLS) if catalog.tools else "not yet loaded"})
 
 @app.route("/mcp", methods=["POST"])
 def mcp_handler():
@@ -545,7 +572,7 @@ def detailed_health():
     return jsonify(catalog.get_health_report())
 
 if __name__ == "__main__":
-    logger.info("Sovereign Mind MCP Gateway v2.1.6 starting...")
+    logger.info("Sovereign Mind MCP Gateway v2.1.7 starting...")
     run_async(catalog.refresh())
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
