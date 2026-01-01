@@ -1,5 +1,5 @@
 """
-Sovereign Mind MCP Gateway v2.1.5
+Sovereign Mind MCP Gateway v2.1.6
 ==================================
 A unified, production-ready MCP server with comprehensive backend support.
 All backends configured with proper error handling and graceful fallback.
@@ -197,6 +197,15 @@ BACKEND_MCPS = {
         "priority": 2,
         "health_check": False,
         "alt_url": "http://100.70.153.106:8080/mcp"
+    },
+    "grok": {
+        "url": os.environ.get("MCP_GROK_URL", "https://grok-mcp.graygrass-be154dbb.eastus.azurecontainerapps.io/mcp"),
+        "prefix": "grok",
+        "description": "Grok AI via xAI API - chat, analysis, agentic mode",
+        "enabled": True,
+        "transport": "json",
+        "priority": 1,
+        "health_check": False
     }
 }
 
@@ -382,7 +391,7 @@ async def call_backend_tool(backend_url: str, tool_name: str, arguments: dict, t
 
 def handle_native_tool(tool_name: str, arguments: dict) -> Dict:
     if tool_name == "gateway_status":
-        return {"content": [{"type": "text", "text": json.dumps({"gateway": "sovereign_mind_gateway", "version": "2.1.5", "timestamp": datetime.now().isoformat(), "health": catalog.get_health_report(), "backends_configured": list(BACKEND_MCPS.keys())}, indent=2)}]}
+        return {"content": [{"type": "text", "text": json.dumps({"gateway": "sovereign_mind_gateway", "version": "2.1.6", "timestamp": datetime.now().isoformat(), "health": catalog.get_health_report(), "backends_configured": list(BACKEND_MCPS.keys())}, indent=2)}]}
     elif tool_name == "hivemind_write":
         tool_info = catalog.get_tool("sm_query_snowflake")
         if not tool_info:
@@ -417,7 +426,7 @@ def handle_native_tool(tool_name: str, arguments: dict) -> Dict:
     return {"content": [{"type": "text", "text": f"Unknown native tool: {tool_name}"}], "isError": True}
 
 def handle_initialize(params: dict) -> Dict:
-    return {"protocolVersion": "2024-11-05", "capabilities": {"tools": {"listChanged": True}}, "serverInfo": {"name": "sovereign-mind-gateway", "version": "2.1.5"}}
+    return {"protocolVersion": "2024-11-05", "capabilities": {"tools": {"listChanged": True}}, "serverInfo": {"name": "sovereign-mind-gateway", "version": "2.1.6"}}
 
 def handle_tools_list(params: dict) -> Dict:
     if catalog.needs_refresh():
@@ -460,7 +469,7 @@ def process_mcp_message(data: dict) -> Dict:
 
 @app.route("/", methods=["GET"])
 def health_check():
-    return jsonify({"status": "healthy", "service": "sovereign-mind-gateway", "version": "2.1.5", "cors": "enabled", "features": ["mcp-proxy", "sse-transport", "health-monitoring", "native-hivemind", "graceful-fallback", "cors-enabled"], "backends": list(BACKEND_MCPS.keys()), "total_tools": len(catalog.tools) + len(NATIVE_TOOLS) if catalog.tools else "not yet loaded"})
+    return jsonify({"status": "healthy", "service": "sovereign-mind-gateway", "version": "2.1.6", "cors": "enabled", "features": ["mcp-proxy", "sse-transport", "health-monitoring", "native-hivemind", "graceful-fallback", "cors-enabled"], "backends": list(BACKEND_MCPS.keys()), "total_tools": len(catalog.tools) + len(NATIVE_TOOLS) if catalog.tools else "not yet loaded"})
 
 @app.route("/mcp", methods=["POST"])
 def mcp_handler():
@@ -536,7 +545,7 @@ def detailed_health():
     return jsonify(catalog.get_health_report())
 
 if __name__ == "__main__":
-    logger.info("Sovereign Mind MCP Gateway v2.1.5 starting...")
+    logger.info("Sovereign Mind MCP Gateway v2.1.6 starting...")
     run_async(catalog.refresh())
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
