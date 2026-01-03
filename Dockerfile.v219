@@ -1,0 +1,19 @@
+FROM public.ecr.aws/docker/library/python:3.11-slim
+
+WORKDIR /app
+
+# Install dependencies
+RUN pip install --no-cache-dir flask flask-cors httpx gunicorn
+
+# Download app.py from known good commit and patch to remove aws backend
+RUN apt-get update && apt-get install -y --no-install-recommends curl && \
+    curl -fsSL -o app.py "https://raw.githubusercontent.com/jstewartrr/sm-mcp-gateway/d505d53/app.py" && \
+    sed -i '227s/},/}/' app.py && \
+    sed -i '228,236d' app.py && \
+    sed -i 's/v2.1.7/v2.1.9/g' app.py && \
+    sed -i 's/"2.1.7"/"2.1.9"/g' app.py && \
+    python3 -c "import ast; ast.parse(open('app.py').read())" && \
+    apt-get purge -y curl && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
+
+EXPOSE 8080
+CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "2", "--threads", "4", "--timeout", "120", "app:app"]
